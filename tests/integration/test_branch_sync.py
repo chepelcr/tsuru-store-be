@@ -104,15 +104,43 @@ def test_preserves_operator_branch_and_terminal_edits(sync_engine):
         assert session.scalar(select(Consecutive)).current_number == 87
 
 
-def test_two_branches_with_terminal_one_roll_back_instead_of_merging(sync_engine):
+def test_two_branches_may_each_have_terminal_one(sync_engine):
+    """The (branch, terminal) pair identifies the point of sale, not the code.
+
+    Hacienda's consecutive is branch(3) + terminal(5), so terminal 1 under
+    branch 1 and terminal 1 under branch 14 are two different terminals — and a
+    real taxpayer has exactly that. The organization-wide unique constraint
+    this replaces rejected the second one, which meant VILMA CORELLA ARTAVIA's
+    branches could never be discovered at all: the sync refused to reassign the
+    existing terminal and rolled the whole message back (TSR-254).
+    """
     service = BranchSyncService()
-    service.sync_from_hacienda("org-1", branches(42))
-    with pytest.raises(ValueError, match="already assigned to another branch"):
-        service.sync_from_hacienda("org-1", branches(999, branch_number=2))
+    service.sync_from_hacienda("org-1", branches(branch_number=1,  terminal_number=1))
+    service.sync_from_hacienda("org-1", branches(branch_number=14, terminal_number=1))
+
     with Session(sync_engine) as session:
-        assert session.scalar(select(func.count()).select_from(Branch)) == 1
-        assert session.scalar(select(func.count()).select_from(Terminal)) == 1
-        assert session.scalar(select(Consecutive)).current_number == 42
+        assert sorted(b.code for b in session.scalars(select(Branch)).all()) == [1, 14]
+        pairs = sorted(
+            (b.code, t.code)
+            for t in session.scalars(select(Terminal)).all()
+            for b in [session.get(Branch, t.branch_id)]
+        )
+        assert pairs == [(1, 1), (14, 1)]
+        # Two terminals, so two independent counters — a shared code must not
+        # collapse them onto one fiscal sequence.
+        assert len(session.scalars(select(Consecutive)).all()) == 2
+
+
+def test_the_same_branch_and_terminal_twice_is_still_one_terminal(sync_engine):
+    """Loosening the constraint must not lose idempotency within a branch."""
+    service = BranchSyncService()
+    service.sync_from_hacienda("org-1", branches(branch_number=7,  terminal_number=3))
+    service.sync_from_hacienda("org-1", branches(branch_number=7,  terminal_number=3))
+
+    with Session(sync_engine) as session:
+        assert len(session.scalars(select(Branch)).all()) == 1
+        assert len(session.scalars(select(Terminal)).all()) == 1
+        assert len(session.scalars(select(Consecutive)).all()) == 1
 
 
 def test_unknown_document_type_rolls_back_entire_message(sync_engine):

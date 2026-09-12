@@ -104,10 +104,14 @@ def create_terminal(
                 
         """Create a new terminal."""
         with TerminalRepository() as repo:
-            existing = repo.find_by_code_and_organization(dto.code, organization_id)
+            # Per branch, not per organization: Hacienda numbers terminals
+            # within a branch, so the same code in another branch is fine.
+            existing = repo.find_by_code_and_branch(
+                dto.code, str(branch.branch_id), organization_id
+            )
             if existing:
                 raise ValueError(
-                    f"Terminal code '{dto.code}' already exists in this organization"
+                    f"Terminal code '{dto.code}' already exists in this branch"
                 )
 
             if dto.device_id:
@@ -153,10 +157,12 @@ def update_terminal(
             return None
 
         if dto.code is not None and dto.code != terminal.code:
-            existing = repo.find_by_code_and_organization(dto.code, organization_id)
+            existing = repo.find_by_code_and_branch(
+                dto.code, str(branch.branch_id), organization_id
+            )
             if existing:
                 raise ValueError(
-                    f"Terminal code '{dto.code}' already exists in this organization"
+                    f"Terminal code '{dto.code}' already exists in this branch"
                 )
 
         if dto.device_id and dto.device_id != terminal.device_id:

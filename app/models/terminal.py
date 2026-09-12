@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy import UniqueConstraint, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -35,6 +35,14 @@ class Terminal(Base, TimestampMixin, StatusMixin):
         Index("idx_terminals_branch", "branch_id"),
         Index("idx_terminals_org", "organization_id"),
         Index("idx_terminals_status", "organization_id", "status"),
-        Index("idx_terminals_org_code", "organization_id", "code", unique=True),
+        # Hacienda numbers terminals WITHIN a branch — its consecutive is
+        # branch(3) + terminal(5) — so the pair is what must be unique.
+        # An organization-wide constraint here rejected branch 14/terminal 1
+        # for an org that already had branch 1/terminal 1, which is a legal
+        # upstream configuration (TSR-254).
+        UniqueConstraint(
+            "organization_id", "branch_id", "code",
+            name="uq_terminals_org_branch_code",
+        ),
         Index("idx_terminals_device_id", "device_id", unique=True),
     )

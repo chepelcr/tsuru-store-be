@@ -20,23 +20,23 @@ class TerminalRepository(DatabaseConnection):
         super().__init__()
 
     def insert_from_history(self, **values) -> Terminal:
-        """Preserve terminal codes and metadata, rejecting cross-branch collisions.
+        """Insert a discovered terminal without overwriting operator-owned fields.
 
-        The current schema makes a code unique across the organization. A code
-        already assigned to another branch cannot safely receive that branch's
-        counters: neither merging nor renumbering preserves its fiscal identity.
-        Raising rolls back this message so it can be retried or reviewed in DLQ.
+        The conflict target is (organization_id, branch_id, code): Hacienda
+        numbers terminals within a branch, so the same code under a different
+        branch is a different terminal, not a collision. This used to conflict
+        on (organization_id, code) and raise when the existing row belonged to
+        another branch — correct given that constraint, but it meant a taxpayer
+        with branch 1/terminal 1 and branch 14/terminal 1 could never have its
+        branches discovered at all (TSR-254, migration c2d3e4f5a6b7).
         """
         stmt = insert(Terminal).values(**values).on_conflict_do_nothing(
-            index_elements=[Terminal.organization_id, Terminal.code],
+            index_elements=[Terminal.organization_id, Terminal.branch_id, Terminal.code],
         )
         self.session.execute(stmt)
-        terminal = self.find_by_code_and_organization(values["code"], values["organization_id"])
-        if str(terminal.branch_id) != str(values["branch_id"]):
-            raise ValueError(
-                f"Terminal code {values['code']} is already assigned to another branch"
-            )
-        return terminal
+        return self.find_by_code_and_branch(
+            values["code"], str(values["branch_id"]), values["organization_id"],
+        )
 
     def find_by_id_and_organization(
         self, terminal_id: str, organization_id: str
@@ -60,7 +60,14 @@ class TerminalRepository(DatabaseConnection):
     def find_by_code_and_organization(
         self, code: int, organization_id: str
     ) -> Optional[Terminal]:
-        """Find a terminal by code and organization."""
+        """Find ANY terminal with this code in the organization.
+
+        Prefer :meth:`find_by_code_and_branch`. Terminal codes are unique per
+        branch, not per organization, so this can match several rows and which
+        one you get is arbitrary. It returns the first rather than raising
+        MultipleResultsFound, because raising would fail on exactly the data
+        migration c2d3e4f5a6b7 exists to permit.
+        """
         try:
             stmt = select(Terminal).where(
                 and_(
@@ -68,7 +75,7 @@ class TerminalRepository(DatabaseConnection):
                     Terminal.organization_id == organization_id,
                 )
             )
-            return self.session.execute(stmt).scalar_one_or_none()
+            return self.session.execute(stmt).scalars().first()
         except SQLAlchemyError as e:
             logger.error(
                 f"Error finding terminal by code {code} for organization {organization_id}: {e}",
