@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Optional
 
 from aws_lambda_powertools.utilities.batch import BatchProcessor, EventType, process_partial_response
 from aws_lambda_powertools.utilities.data_classes import SQSRecord
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class SqsHandler:
-    def __init__(self, service: BranchSyncService | None = None):
+    def __init__(self, service: Optional[BranchSyncService] = None):
         self._service = service or BranchSyncService()
 
     def handle(self, event, context):

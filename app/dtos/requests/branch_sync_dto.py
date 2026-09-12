@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,12 +13,12 @@ class SyncDTO(BaseModel):
 
 
 class BranchPhoneDTO(SyncDTO):
-    country_code: Optional[str | int] = Field(None, alias="countryCode")
-    number: Optional[str | int] = None
+    country_code: Optional[Union[str, int]] = Field(None, alias="countryCode")
+    number: Optional[Union[str, int]] = None
 
 
 class BranchResidenceDTO(SyncDTO):
-    country_code: Optional[str | int] = Field(None, alias="countryCode")
+    country_code: Optional[Union[str, int]] = Field(None, alias="countryCode")
     province_code: Optional[int] = Field(None, alias="provinceCode", ge=1)
     canton_code: Optional[int] = Field(None, alias="cantonCode", ge=1)
     district_code: Optional[int] = Field(None, alias="districtCode", ge=1)
