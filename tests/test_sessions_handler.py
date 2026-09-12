@@ -11,6 +11,7 @@ from app.dtos.requests.session_request_dto import (
     SessionUpdateRequestDTO,
 )
 from app.dtos.responses.session_dto import SessionResponse
+from app.models.assignment import Assignment
 from app.models.session import Session
 from app.services import session_service
 
@@ -36,29 +37,29 @@ class TestSessionService:
             type="match",
             context="gradas",
             start_time=now,
-            is_active=True,
+            status=1,
             expected_revenue=1500000.00,
             created_by=user_id,
         )
-        mock_session.created_at = now
-        mock_session.updated_at = now
+        mock_session.created_on = now
+        mock_session.updated_on = now
 
         mock_repo = MagicMock()
-        mock_repo.find_all_by_organization.return_value = [mock_session]
+        mock_repo.find_all_paginated.return_value = ([mock_session], 1)
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
         # Act
         result = session_service.get_sessions(org_id, user_id)
 
         # Assert
-        assert len(result) == 1
-        assert result[0].session_id == str(session_id)
-        assert result[0].name == "Partido vs Herediano"
-        assert result[0].type == "match"
-        assert result[0].context == "gradas"
-        assert result[0].is_active is True
-        mock_repo.find_all_by_organization.assert_called_once_with(
-            org_id, is_active=None, branch_id=None, session_type=None, context=None
+        assert len(result.data) == 1
+        assert result.data[0].session_id == str(session_id)
+        assert result.data[0].name == "Partido vs Herediano"
+        assert result.data[0].type == "match"
+        assert result.data[0].context == "gradas"
+        assert result.data[0].status == 1
+        mock_repo.find_all_paginated.assert_called_once_with(
+            org_id, filters=[], order_by=None, page=1, page_size=12
         )
 
     @patch("app.services.session_service.SessionRepository")
@@ -70,18 +71,23 @@ class TestSessionService:
         branch_id = str(uuid.uuid4())
 
         mock_repo = MagicMock()
-        mock_repo.find_all_by_organization.return_value = []
+        mock_repo.find_all_paginated.return_value = ([], 0)
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
         # Act
-        result = session_service.get_sessions(
-            org_id, user_id, is_active=True, branch_id=branch_id, session_type="match", context="gradas"
+        # The per-field filter kwargs were replaced by one `search` string that
+        # SearchUtils parses into SQLAlchemy filters, so what reaches the
+        # repository is a filter list plus page bounds — not a kwarg per field.
+        session_service.get_sessions(
+            org_id, user_id, page=2, page_size=5, search="type:match"
         )
 
         # Assert
-        mock_repo.find_all_by_organization.assert_called_once_with(
-            org_id, is_active=True, branch_id=branch_id, session_type="match", context="gradas"
-        )
+        call = mock_repo.find_all_paginated.call_args
+        assert call.args == (org_id,)
+        assert call.kwargs["page"] == 2
+        assert call.kwargs["page_size"] == 5
+        assert call.kwargs["filters"], "the search string should reach the query"
 
     @patch("app.services.session_service.SessionRepository")
     def test_create_session_success(self, mock_repo_class):
@@ -110,12 +116,12 @@ class TestSessionService:
             type=dto.type,
             context=dto.context,
             start_time=dto.start_time,
-            is_active=True,
+            status=1,
             expected_revenue=dto.expected_revenue,
             created_by=user_id,
         )
-        mock_session.created_at = now
-        mock_session.updated_at = now
+        mock_session.created_on = now
+        mock_session.updated_on = now
 
         mock_repo = MagicMock()
         mock_repo.validate_branch_exists.return_value = True
@@ -129,7 +135,7 @@ class TestSessionService:
         assert result.name == "Partido vs Herediano"
         assert result.type == "match"
         assert result.context == "gradas"
-        assert result.is_active is True
+        assert result.status == 1
         assert result.expected_revenue == 1500000.00
         mock_repo.validate_branch_exists.assert_called_once_with(branch_id, org_id)
         mock_repo.save.assert_called_once()
@@ -158,11 +164,11 @@ class TestSessionService:
             type=dto.type,
             context=dto.context,
             start_time=dto.start_time,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
-        mock_session.created_at = now
-        mock_session.updated_at = now
+        mock_session.created_on = now
+        mock_session.updated_on = now
 
         mock_repo = MagicMock()
         mock_repo.save.return_value = mock_session
@@ -219,11 +225,11 @@ class TestSessionService:
             type="match",
             context="gradas",
             start_time=now,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
-        existing_session.created_at = now
-        existing_session.updated_at = now
+        existing_session.created_on = now
+        existing_session.updated_on = now
 
         dto = SessionUpdateRequestDTO(
             name="Partido vs Herediano - Final",
@@ -262,15 +268,11 @@ class TestSessionService:
             context="gradas",
             start_time=now,
             end_time=None,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
-        existing_session.created_at = now
-        existing_session.updated_at = now
-
-        dto = SessionUpdateRequestDTO(
-            is_active=False,
-        )
+        existing_session.created_on = now
+        existing_session.updated_on = now
 
         mock_repo = MagicMock()
         mock_repo.find_by_id_and_organization.return_value = existing_session
@@ -278,11 +280,23 @@ class TestSessionService:
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
         # Act
-        result = session_service.update_session(org_id, user_id, str(session_id), dto)
+        # Status changes go through update_session_status, not update_session —
+        # that is the entry point which also stamps end_time, and it ends the
+        # session's open assignments on the way.
+        with patch(
+            "app.repositories.assignment_repository.AssignmentRepository"
+        ) as assign_class:
+            assign_repo = MagicMock()
+            assign_repo.find_all_by_organization.return_value = []
+            assign_class.return_value.__enter__.return_value = assign_repo
+
+            result = session_service.update_session_status(
+                org_id, user_id, str(session_id), 2
+            )
 
         # Assert
         assert result is not None
-        assert result.is_active is False
+        assert result.status == 2
         assert existing_session.end_time is not None
         mock_repo.save.assert_called_once()
 
@@ -302,18 +316,45 @@ class TestSessionService:
             type="match",
             context="gradas",
             start_time=datetime.now(timezone.utc),
-            is_active=True,
+            status=1,
+            created_by=user_id,
+        )
+
+        active = Assignment(
+            assignment_id=uuid.uuid4(),
+            organization_id=org_id,
+            session_id=session_id,
+            terminal_id=uuid.uuid4(),
+            user_id="cashier-1",
+            role="cashier",
+            start_time=datetime.now(timezone.utc),
+            status=1,
             created_by=user_id,
         )
 
         mock_repo = MagicMock()
         mock_repo.find_by_id_and_organization.return_value = existing_session
-        mock_repo.has_active_assignments.return_value = True
+        mock_repo.delete.return_value = True
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
-        # Act & Assert
-        with pytest.raises(ValueError, match="active assignments"):
-            session_service.delete_session(org_id, user_id, str(session_id))
+        # Act
+        # Deleting a session no longer refuses when assignments are open — it
+        # ends them first. Patched at the source module because the service
+        # imports AssignmentRepository inside the function body.
+        with patch(
+            "app.repositories.assignment_repository.AssignmentRepository"
+        ) as assign_class:
+            assign_repo = MagicMock()
+            assign_repo.find_all_by_organization.return_value = [active]
+            assign_class.return_value.__enter__.return_value = assign_repo
+
+            result = session_service.delete_session(org_id, user_id, str(session_id))
+
+        # Assert
+        assert result is True
+        assert active.status == 2, "an open assignment must be closed, not left active"
+        assert active.end_time is not None
+        assign_repo.save.assert_called_once_with(active)
 
     @patch("app.services.session_service.SessionRepository")
     def test_delete_session_success(self, mock_repo_class):
@@ -331,18 +372,24 @@ class TestSessionService:
             type="match",
             context="gradas",
             start_time=datetime.now(timezone.utc),
-            is_active=False,
+            status=2,
             created_by=user_id,
         )
 
         mock_repo = MagicMock()
         mock_repo.find_by_id_and_organization.return_value = existing_session
-        mock_repo.has_active_assignments.return_value = False
         mock_repo.delete.return_value = True
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
         # Act
-        result = session_service.delete_session(org_id, user_id, str(session_id))
+        with patch(
+            "app.repositories.assignment_repository.AssignmentRepository"
+        ) as assign_class:
+            assign_repo = MagicMock()
+            assign_repo.find_all_by_organization.return_value = []
+            assign_class.return_value.__enter__.return_value = assign_repo
+
+            result = session_service.delete_session(org_id, user_id, str(session_id))
 
         # Assert
         assert result is True

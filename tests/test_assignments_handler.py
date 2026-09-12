@@ -39,27 +39,34 @@ class TestAssignmentService:
             terminal_id=terminal_id,
             role="cashier",
             start_time=now,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
-        mock_assignment.created_at = now
-        mock_assignment.updated_at = now
+        mock_assignment.created_on = now
+        mock_assignment.updated_on = now
 
         mock_repo = MagicMock()
-        mock_repo.find_all_by_organization.return_value = [mock_assignment]
+        mock_repo.find_all_paginated.return_value = ([mock_assignment], 1)
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
         # Act
-        result = assignment_service.get_assignments(org_id, user_id)
+        # get_assignments batch-enriches from UserRepository; unmocked it
+        # reaches for real database credentials.
+        with patch("app.services.assignment_service.UserRepository") as user_class:
+            user_repo = MagicMock()
+            user_repo.find_by_ids.return_value = {}
+            user_class.return_value.__enter__.return_value = user_repo
+
+            result = assignment_service.get_assignments(org_id, user_id)
 
         # Assert
-        assert len(result) == 1
-        assert result[0].assignment_id == str(assignment_id)
-        assert result[0].user_id == "cashier-789"
-        assert result[0].role == "cashier"
-        assert result[0].is_active is True
-        mock_repo.find_all_by_organization.assert_called_once_with(
-            org_id, is_active=None, session_id=None, user_id=None, branch_id=None
+        assert len(result.data) == 1
+        assert result.data[0].assignment_id == str(assignment_id)
+        assert result.data[0].user_id == "cashier-789"
+        assert result.data[0].role == "cashier"
+        assert result.data[0].status == 1
+        mock_repo.find_all_paginated.assert_called_once_with(
+            org_id, filters=[], order_by=None, page=1, page_size=12
         )
 
     @patch("app.services.assignment_service.AssignmentRepository")
@@ -73,27 +80,22 @@ class TestAssignmentService:
         assigned_user_id = "cashier-789"
 
         mock_repo = MagicMock()
-        mock_repo.find_all_by_organization.return_value = []
+        mock_repo.find_all_paginated.return_value = ([], 0)
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
         # Act
-        result = assignment_service.get_assignments(
-            org_id,
-            user_id,
-            is_active=True,
-            session_id=session_id,
-            assigned_user_id=assigned_user_id,
-            branch_id=branch_id,
+        # Per-field filter kwargs were replaced by one `search` string that
+        # SearchUtils parses into SQLAlchemy filters.
+        assignment_service.get_assignments(
+            org_id, user_id, page=3, page_size=7, search=f"session_id:{session_id}"
         )
 
         # Assert
-        mock_repo.find_all_by_organization.assert_called_once_with(
-            org_id,
-            is_active=True,
-            session_id=session_id,
-            user_id=assigned_user_id,
-            branch_id=branch_id,
-        )
+        call = mock_repo.find_all_paginated.call_args
+        assert call.args == (org_id,)
+        assert call.kwargs["page"] == 3
+        assert call.kwargs["page_size"] == 7
+        assert call.kwargs["filters"], "the search string should reach the query"
 
     @patch("app.services.assignment_service.AssignmentRepository")
     def test_get_assignment_by_id_success(self, mock_repo_class):
@@ -115,18 +117,27 @@ class TestAssignmentService:
             terminal_id=None,
             role="supervisor",
             start_time=now,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
-        mock_assignment.created_at = now
-        mock_assignment.updated_at = now
+        mock_assignment.created_on = now
+        mock_assignment.updated_on = now
 
         mock_repo = MagicMock()
         mock_repo.find_by_id_and_organization.return_value = mock_assignment
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
         # Act
-        result = assignment_service.get_assignment(org_id, user_id, str(assignment_id))
+        # get_assignment enriches the row from UserRepository; unmocked it
+        # reaches for real database credentials.
+        with patch("app.services.assignment_service.UserRepository") as user_class:
+            user_repo = MagicMock()
+            user_repo.find_by_ids.return_value = {}
+            user_class.return_value.__enter__.return_value = user_repo
+
+            result = assignment_service.get_assignment(
+                org_id, user_id, str(assignment_id)
+            )
 
         # Assert
         assert result is not None
@@ -185,11 +196,11 @@ class TestAssignmentService:
             terminal_id=uuid.UUID(terminal_id),
             role=dto.role,
             start_time=dto.start_time,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
-        mock_assignment.created_at = now
-        mock_assignment.updated_at = now
+        mock_assignment.created_on = now
+        mock_assignment.updated_on = now
 
         mock_repo = MagicMock()
         mock_repo.validate_session_exists_and_active.return_value = True
@@ -205,7 +216,7 @@ class TestAssignmentService:
         # Assert
         assert result.user_id == "cashier-789"
         assert result.role == "cashier"
-        assert result.is_active is True
+        assert result.status == 1
         assert result.terminal_id == terminal_id
         mock_repo.validate_session_exists_and_active.assert_called_once_with(
             session_id, org_id
@@ -244,11 +255,11 @@ class TestAssignmentService:
             terminal_id=None,
             role=dto.role,
             start_time=dto.start_time,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
-        mock_assignment.created_at = now
-        mock_assignment.updated_at = now
+        mock_assignment.created_on = now
+        mock_assignment.updated_on = now
 
         mock_repo = MagicMock()
         mock_repo.validate_session_exists_and_active.return_value = True
@@ -378,7 +389,7 @@ class TestAssignmentService:
             terminal_id=None,
             role="cashier",
             start_time=now,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
 
@@ -414,11 +425,11 @@ class TestAssignmentService:
             terminal_id=terminal_id,
             role="cashier",
             start_time=now,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
-        existing_assignment.created_at = now
-        existing_assignment.updated_at = now
+        existing_assignment.created_on = now
+        existing_assignment.updated_on = now
 
         dto = AssignmentUpdateRequestDTO(
             terminal_id=new_terminal_id,
@@ -464,15 +475,11 @@ class TestAssignmentService:
             role="cashier",
             start_time=now,
             end_time=None,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
-        existing_assignment.created_at = now
-        existing_assignment.updated_at = now
-
-        dto = AssignmentUpdateRequestDTO(
-            is_active=False,
-        )
+        existing_assignment.created_on = now
+        existing_assignment.updated_on = now
 
         mock_repo = MagicMock()
         mock_repo.find_by_id_and_organization.return_value = existing_assignment
@@ -480,13 +487,15 @@ class TestAssignmentService:
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
         # Act
-        result = assignment_service.update_assignment(
-            org_id, user_id, str(assignment_id), dto
+        # Status changes go through update_assignment_status, not
+        # update_assignment — that is the entry point which stamps end_time.
+        result = assignment_service.update_assignment_status(
+            org_id, user_id, str(assignment_id), 2
         )
 
         # Assert
         assert result is not None
-        assert result.is_active is False
+        assert result.status == 2
         assert existing_assignment.end_time is not None
         mock_repo.save.assert_called_once()
 
@@ -499,7 +508,7 @@ class TestAssignmentService:
         assignment_id = str(uuid.uuid4())
 
         dto = AssignmentUpdateRequestDTO(
-            is_active=False,
+            status=2,
         )
 
         mock_repo = MagicMock()
@@ -534,7 +543,7 @@ class TestAssignmentService:
             terminal_id=None,
             role="cashier",
             start_time=now,
-            is_active=True,
+            status=1,
             created_by=user_id,
         )
 
@@ -571,7 +580,7 @@ class TestAssignmentService:
             terminal_id=None,
             role="cashier",
             start_time=now,
-            is_active=False,
+            status=2,
             created_by=user_id,
         )
 

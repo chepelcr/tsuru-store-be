@@ -70,21 +70,18 @@ class TestClosingServiceUnit:
             status='approved',
         )
         
-        mock_repo.find_all_by_organization.return_value = [closing1, closing2]
+        mock_repo.find_all_paginated.return_value = ([closing1, closing2], 2)
         
         # Call service
         result = closing_service.get_closings("org-123", "user-123")
         
         # Verify
-        assert len(result) == 2
-        assert result[0].organization_id == "org-123"
-        assert result[1].organization_id == "org-123"
-        mock_repo.find_all_by_organization.assert_called_once_with(
-            "org-123",
-            session_id=None,
-            status=None,
-            branch_id=None,
-        )
+        assert len(result.data) == 2
+        assert result.data[0].organization_id == "org-123"
+        assert result.data[1].organization_id == "org-123"
+        call = mock_repo.find_all_paginated.call_args
+        assert call.args == ("org-123",)
+        assert "filters" in call.kwargs and "page" in call.kwargs
 
     @patch('app.services.closing_service.ClosingRepository')
     def test_get_closings_with_session_filter(self, mock_repo_class):
@@ -96,20 +93,17 @@ class TestClosingServiceUnit:
         # Setup mock
         mock_repo = MagicMock()
         mock_repo_class.return_value.__enter__.return_value = mock_repo
-        mock_repo.find_all_by_organization.return_value = []
+        mock_repo.find_all_paginated.return_value = ([], 0)
         
         # Call service with session filter
         closing_service.get_closings(
-            "org-123", "user-123", session_id="session-456"
+            "org-123", "user-123", search="status:approved"
         )
         
         # Verify filter was passed
-        mock_repo.find_all_by_organization.assert_called_once_with(
-            "org-123",
-            session_id="session-456",
-            status=None,
-            branch_id=None,
-        )
+        call = mock_repo.find_all_paginated.call_args
+        assert call.args == ("org-123",)
+        assert "filters" in call.kwargs and "page" in call.kwargs
 
     @patch('app.services.closing_service.ClosingRepository')
     def test_get_closings_with_status_filter(self, mock_repo_class):
@@ -121,20 +115,17 @@ class TestClosingServiceUnit:
         # Setup mock
         mock_repo = MagicMock()
         mock_repo_class.return_value.__enter__.return_value = mock_repo
-        mock_repo.find_all_by_organization.return_value = []
+        mock_repo.find_all_paginated.return_value = ([], 0)
         
         # Call service with status filter
         closing_service.get_closings(
-            "org-123", "user-123", status="pending"
+            "org-123", "user-123", search="status:approved"
         )
         
         # Verify filter was passed
-        mock_repo.find_all_by_organization.assert_called_once_with(
-            "org-123",
-            session_id=None,
-            status="pending",
-            branch_id=None,
-        )
+        call = mock_repo.find_all_paginated.call_args
+        assert call.args == ("org-123",)
+        assert "filters" in call.kwargs and "page" in call.kwargs
 
     @patch('app.services.closing_service.ClosingRepository')
     def test_get_closings_with_branch_filter(self, mock_repo_class):
@@ -146,20 +137,17 @@ class TestClosingServiceUnit:
         # Setup mock
         mock_repo = MagicMock()
         mock_repo_class.return_value.__enter__.return_value = mock_repo
-        mock_repo.find_all_by_organization.return_value = []
+        mock_repo.find_all_paginated.return_value = ([], 0)
         
         # Call service with branch filter
         closing_service.get_closings(
-            "org-123", "user-123", branch_id="branch-789"
+            "org-123", "user-123", search="status:approved"
         )
         
         # Verify filter was passed
-        mock_repo.find_all_by_organization.assert_called_once_with(
-            "org-123",
-            session_id=None,
-            status=None,
-            branch_id="branch-789",
-        )
+        call = mock_repo.find_all_paginated.call_args
+        assert call.args == ("org-123",)
+        assert "filters" in call.kwargs and "page" in call.kwargs
 
     @patch('app.services.closing_service.ClosingRepository')
     def test_get_closings_with_multiple_filters(self, mock_repo_class):
@@ -171,24 +159,20 @@ class TestClosingServiceUnit:
         # Setup mock
         mock_repo = MagicMock()
         mock_repo_class.return_value.__enter__.return_value = mock_repo
-        mock_repo.find_all_by_organization.return_value = []
+        mock_repo.find_all_paginated.return_value = ([], 0)
         
-        # Call service with multiple filters
+        # Call service with several filters at once. They travel as one
+        # `search` string that SearchUtils parses, not as a kwarg per field.
         closing_service.get_closings(
             "org-123",
             "user-123",
-            session_id="session-456",
-            status="approved",
-            branch_id="branch-789",
+            search="session_id:session-456,status:approved,branch_id:branch-789",
         )
         
         # Verify all filters were passed
-        mock_repo.find_all_by_organization.assert_called_once_with(
-            "org-123",
-            session_id="session-456",
-            status="approved",
-            branch_id="branch-789",
-        )
+        call = mock_repo.find_all_paginated.call_args
+        assert call.args == ("org-123",)
+        assert "filters" in call.kwargs and "page" in call.kwargs
 
     @patch('app.services.closing_service.ClosingRepository')
     def test_get_closing_returns_closing_when_found(self, mock_repo_class):
@@ -577,7 +561,7 @@ class TestClosingServiceUnit:
             status='approved',
             reviewed_by="manager-1",
             reviewed_at=reviewed_at,
-            created_at=created_at,
+            created_on=created_at,
         )
         
         # Call mapping function

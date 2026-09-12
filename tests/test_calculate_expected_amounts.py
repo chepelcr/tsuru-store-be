@@ -15,6 +15,10 @@ from app.configuration.database_connection import DatabaseConnection
 
 
 @pytest.mark.unit
+# Needs a real database: every test opens DatabaseConnection directly and
+# creates a sales_orders table. Marked so the conftest skips it cleanly
+# when no database is configured, instead of erroring on credentials.
+@pytest.mark.integration
 class TestCalculateExpectedAmounts:
     """Test the calculate_expected_amounts method."""
 
