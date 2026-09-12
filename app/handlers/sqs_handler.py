@@ -22,10 +22,14 @@ class SqsHandler:
     def handle(self, event, context):
         # Return failed item ids even if the entire batch fails; Lambda must not
         # accidentally acknowledge a malformed event or hide it in a 200 envelope.
+        # No `logger=` kwarg: it does not exist on the powertools release pip
+        # resolves for this image's python 3.9, and passing it raised
+        # TypeError on every invocation. Record failures are logged in
+        # _process_record instead, which works on any version and names the
+        # message id.
         processor = BatchProcessor(
             event_type=EventType.SQS,
             raise_on_entire_batch_failure=False,
-            logger=logger,
         )
         return process_partial_response(
             event=event,
@@ -35,6 +39,15 @@ class SqsHandler:
         )
 
     def _process_record(self, record: SQSRecord):
+        try:
+            self._handle(record)
+        except Exception:
+            logger.error(
+                "Branch sync record %s failed", record.message_id, exc_info=True,
+            )
+            raise
+
+    def _handle(self, record: SQSRecord):
         body = json.loads(record.body)
         if isinstance(body, dict) and "Message" in body:
             body = json.loads(body["Message"])
