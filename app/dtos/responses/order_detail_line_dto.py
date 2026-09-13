@@ -146,12 +146,25 @@ class OrderDetailLineResponse(BaseModel):
 
     taxes: Optional[list] = Field(
         None,
-        description="Per-line tax breakdown [{code, rate_code, rate, base, amount}]",
+        description=(
+            "Per-line tax breakdown, canonical `ProductTaxDTO` shape: "
+            "[{tax_type_id, tax_rate: {id, percentage, code}, tax_factor: "
+            "{id, factor}, special_fields: {quantity, percentage, proportion, "
+            "volume_consumption, tax_amount: {id, amount}}, exemption: {type, "
+            "other_type, number, institution, percentage}, is_amount, amount}]. "
+            "Rows written before this was unified are normalized on read; the "
+            "flatter `{code, rate_code, rate}` request spelling is legacy."
+        ),
     )
 
     discounts: Optional[list] = Field(
         None,
-        description="Per-line discount cascade [{code, nature, percentage, amount}]",
+        description=(
+            "Per-line discount cascade in Nota 20 order, canonical "
+            "`ProductDiscountDTO` shape: [{discount_type_id, percentage, reason, "
+            "is_amount, amount}]. Note `reason` is the Nota 20 free text — the "
+            "request spelling calls the same field `nature`."
+        ),
     )
 
     # ── The rest of the document line ────────────────────────────────────

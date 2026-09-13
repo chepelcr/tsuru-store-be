@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.configuration.database_connection import DatabaseConnection
 from app.dtos.requests.product_request_dto import ProductCodeDTO
 from app.enums.hacienda_codes import ProductCodeType
+from app.utils.product_fiscal_defaults import DEFAULT_UNIT_MEASURE, default_iva_row
 from app.enums.product_status import ProductStatus
 from app.models.category import Category
 from app.models.product import Product
@@ -327,6 +328,16 @@ class ProductRepository(DatabaseConnection):
                 status=ProductStatus.ACTIVE,
                 units_per_box=units_per_box,
                 codes=codes_array,
+                # A product created here has no operator behind it — the
+                # spreadsheet that produced it has no fiscal columns — so it
+                # used to arrive with no unit of measure and no taxes at all.
+                # An order line copies its product's taxes verbatim, so such a
+                # product made every order built from it total to zero tax
+                # (26 of them, before the TSR-236 backfill) and file with no
+                # IVA. Seeding the defaults here fixes it at the source instead
+                # of leaving a backfill as the only repair.
+                unit_measure=DEFAULT_UNIT_MEASURE,
+                taxes=[default_iva_row(None)],
             )
             self.session.add(product)
             self.session.flush()

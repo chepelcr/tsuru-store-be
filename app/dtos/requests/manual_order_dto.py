@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.dtos.requests.product_request_dto import TaxExemptionDTO
+from app.enums.hacienda_codes import TaxRateCode, TaxType
 
 
 class ManualOrderPartyDTO(BaseModel):
@@ -62,22 +65,113 @@ class ManualOrderTaxSpecialFieldsDTO(BaseModel):
     tax_unit_amount: Optional[float] = Field(None, ge=0)
 
 
+#: The IVA family — codes whose percentage comes from the rate CODE, not a rate.
+_IVA_FAMILY_CODES = frozenset(
+    {TaxType.IVA.value, TaxType.IVACE.value, TaxType.IVARBU.value}
+)
+
+#: Per-code `special_fields` requirements (Hacienda Nota 7). Mirrors the map in
+#: `ProductTaxDTO._validate_special_fields` — an order line and the product it
+#: came from must demand the same parameters, or a pedido can carry an excise the
+#: product form would have refused.
+_SPECIAL_FIELDS_BY_CODE: dict[str, tuple[str, ...]] = {
+    TaxType.IUC.value: ("quantity", "tax_amount_id"),
+    TaxType.IPT.value: ("quantity", "tax_amount_id"),
+    TaxType.ISEC.value: ("quantity", "tax_amount_id"),
+    TaxType.ISEBA.value: ("quantity", "percentage", "tax_amount_id"),
+    TaxType.ISEBEC.value: ("quantity", "volume_consumption", "tax_amount_id"),
+}
+
+
 class ManualOrderTaxDTO(BaseModel):
-    """Per-line tax breakdown. Kept structured so the server can recompute."""
+    """Per-line tax breakdown. Kept structured so the server can recompute.
+
+    Validated to the same standard as `ProductTaxDTO`. It used not to be, which
+    meant a pedido could be accepted here carrying tax data that only failed
+    much later — when the pedido was billed, by which point the person who typed
+    it is long gone and a consecutive may already have been allocated.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
     code: Optional[str] = Field(None, max_length=4, description="Hacienda tax type code")
     rate_code: Optional[str] = Field(None, max_length=4)
     rate: Optional[float] = Field(None, ge=0)
-    base: Optional[float] = Field(None, ge=0)
     amount: Optional[float] = Field(None, ge=0)
-    factory_assumed: Optional[bool] = False
     #: Required when code = "99" (Otros).
     other_tax_type: Optional[str] = Field(None, max_length=100)
     #: `FactorCalculoIVA` for code "08" (régimen de bienes usados).
     factor: Optional[float] = Field(None, ge=0)
     special_fields: Optional[ManualOrderTaxSpecialFieldsDTO] = None
+    #: `Exoneracion` for this tax (Nota 10.1). Per-TAX, as on the document.
+    #: Reuses the product DTO so one definition validates both paths.
+    exemption: Optional[TaxExemptionDTO] = None
+
+    # `base` and `factory_assumed` were accepted here and then dropped on the
+    # floor — `canonical_line_dtos` never read either one, so a caller sending
+    # them got no error and no effect. Removed rather than implemented: the
+    # taxable base is only editable in two documented cases and belongs on the
+    # LINE (`base_amount`), and whether the issuer absorbs a tax is DERIVED from
+    # the tax code and the discount natures, never asserted by the client.
+
+    @field_validator("rate_code")
+    @classmethod
+    def _validate_rate_code(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not str(value).strip():
+            return value
+        allowed = {m.value for m in TaxRateCode}
+        if str(value) not in allowed:
+            raise ValueError(
+                f"rate_code {value!r} is not a valid Hacienda Nota 8.1 rate code."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _validate_code_requirements(self) -> "ManualOrderTaxDTO":
+        """The per-code requirements, mirroring `ProductTaxDTO`.
+
+        Same three rules the biller enforces, applied at capture time:
+        the IVA family needs its rate code (the percentage is derived from the
+        code alone, so without it the line cannot be priced); code 08 needs its
+        factor (the factor IS the calculation); and the specific excises need the
+        per-unit parameters they multiply, which cannot be recovered from a total.
+        """
+        code = (self.code or "").strip()
+        if not code:
+            return self
+
+        if code in _IVA_FAMILY_CODES and not (self.rate_code or "").strip():
+            raise ValueError(
+                f"rate_code is required for tax code {code!r}; the percentage "
+                f"alone does not identify the tax treatment."
+            )
+
+        if code == TaxType.IVARBU.value and self.factor is None:
+            raise ValueError(
+                "factor is required for tax code 08 (IVA Régimen de Bienes "
+                "Usados); the factor is the calculation, not a rate modifier."
+            )
+
+        required = _SPECIAL_FIELDS_BY_CODE.get(code)
+        if not required:
+            return self
+        sf = self.special_fields
+        if sf is None:
+            raise ValueError(
+                f"Tax code {code} requires special_fields with keys {required}."
+            )
+        missing: list[str] = []
+        for key in required:
+            if key == "tax_amount_id":
+                if sf.tax_amount_id is None or not str(sf.tax_amount_id).strip():
+                    missing.append("tax_amount_id")
+            elif getattr(sf, key, None) is None:
+                missing.append(key)
+        if missing:
+            raise ValueError(
+                f"Tax code {code} is missing required special_fields: {missing}."
+            )
+        return self
 
 
 class ManualOrderDiscountDTO(BaseModel):

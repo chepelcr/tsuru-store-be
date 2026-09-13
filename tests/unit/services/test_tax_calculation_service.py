@@ -28,6 +28,11 @@ from app.services.tax_calculation_service import TaxCalculator
 D = Decimal
 
 
+#: Codes whose percentage is derived from the rate CODE rather than a supplied
+#: rate, and which therefore cannot be represented without one.
+_IVA_FAMILY = (TaxType.IVA, TaxType.IVACE, TaxType.IVARBU)
+
+
 def _make_tax(
     tax_type: TaxType,
     *,
@@ -39,6 +44,18 @@ def _make_tax(
     sf_volume: Decimal | None = None,
     sf_amount: Decimal | None = None,
 ) -> ProductTaxDTO:
+    # An IVA-family tax is not representable without its Nota 8.1 rate code —
+    # sales-api derives the percentage from the code alone, so a row with a rate
+    # and no code cannot be priced, and `ProductTaxDTO` now refuses it. The
+    # fixtures default to the general 13% bracket so each test states only the
+    # variable it is actually exercising; a test that cares about the bracket
+    # passes `rate_code` explicitly.
+    if tax_type in _IVA_FAMILY:
+        if rate_code is None:
+            rate_code = TaxRateCode.GENERAL_13
+        if rate is None:
+            rate = Decimal("13")
+
     return ProductTaxDTO(
         tax_type_id=tax_type.value,
         tax_rate=(

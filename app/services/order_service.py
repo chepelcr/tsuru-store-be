@@ -23,7 +23,8 @@ from app.dtos.requests.product_request_dto import (
 )
 from app.dtos.requests.storefront_order_dto import CreateStorefrontOrderDTO
 from app.dtos.responses.storefront_order_dto import StorefrontOrderCreatedResponse
-from app.enums.hacienda_codes import DiscountType, ProductCodeType
+from app.enums.hacienda_codes import DiscountType, ProductCodeType, TaxType
+from app.utils.product_fiscal_defaults import repair_tax_rows
 from app.enums.order_status import ORDER_STATUS_CODES, can_transition
 from app.enums.report_color import ReportColorScheme, get_color_palette
 from app.dtos.responses.order_dto import PaginationResponse
@@ -55,6 +56,11 @@ from app.utils.crossdocking_utils import decode_excel_file
 from app.utils.money import allocate_money, q_money, round_money, sum_money, to_decimal
 
 logger = logging.getLogger(__name__)
+
+#: `Order.source` for a pedido captured in the POS rather than imported from a
+#: spreadsheet. Only a manual order legitimately carries an operator-set
+#: `base_amount`, which is why the repair paths branch on it.
+MANUAL_ORDER_SOURCE = "manual"
 
 #: Numeric status code → status name, inverted from the canonical map so the
 #: two can never drift.
@@ -301,10 +307,18 @@ def reprocess_order(organization_id: str, document_number: str, color=None) -> O
 
     1. the order and crossdocking spreadsheets are re-parsed from S3 when they
        are stored, so a change to the parser reaches an existing order;
-    2. **every line's amounts are recomputed through the current discount/tax
-       engine** and the order totals re-added from them — this runs even with no
-       spreadsheet on file, which is what makes the button a repair tool for
-       orders captured before an engine fix;
+    2. **every line's MISSING fiscal detail is refilled from its product, and
+       then the amounts are recomputed** through the current discount/tax engine
+       with the order totals re-added from them. Both halves run even with no
+       spreadsheet on file, which is what makes the button a repair tool.
+
+       The refill is what turns this from a recompute into a repair. Recomputing
+       money over a line that carries no tax structure is a no-op — and that is
+       all this did unless the original spreadsheet was still in S3, so the
+       orders that most needed fixing (a storefront order, a manual one, or any
+       whose file has been deleted) were exactly the ones it skipped. A line
+       with a null `cabys` or no taxes is now filled in from the product it
+       points at, which is where that data lives;
     3. the PDF, the crossdocking PDF and the Nuevo Reporte are regenerated.
     """
     logger.info(f"[REPROCESS] START order={document_number} org={organization_id} color={color}")
@@ -347,7 +361,15 @@ def reprocess_order(organization_id: str, document_number: str, color=None) -> O
                 order = repo.save(order)
                 logger.info(f"Re-parsed order Excel for {document_number}")
             except Exception as e:
-                logger.warning(f"Failed to re-parse order Excel for {document_number}: {e}", exc_info=True)
+                # Deliberately best-effort: a deleted, moved or unreadable
+                # spreadsheet is an expected state for an older order, and the
+                # repair + recompute phase below does not depend on it. Logged
+                # with the phase named so a partial reprocess is legible.
+                logger.warning(
+                    f"[REPROCESS] Excel re-parse phase failed for {document_number} "
+                    f"(continuing to the repair phase, which does not need it): {e}",
+                    exc_info=True,
+                )
         else:
             logger.info(f"[REPROCESS] No order Excel URL — skipping Excel re-parse")
 
@@ -361,21 +383,40 @@ def reprocess_order(organization_id: str, document_number: str, color=None) -> O
         # without needing the original file. Lines with no structured detail are
         # left alone (see `_recompute_imported_line`), so a hand-captured order
         # the user edited is never silently re-priced.
-        logger.info(f"[REPROCESS] Recomputing line amounts with the current engine")
+        logger.info(f"[REPROCESS] Repairing line fiscal detail, then recomputing")
         try:
+            clear_derived_base_amounts(order)
+            repairs = refill_line_fiscal_fields(order)
             for line in (order.lines or []):
                 _recompute_imported_line(line, line.product)
             _resum_order_totals(order)
             order = repo.save(order)
+            if repairs:
+                logger.info(
+                    f"[REPROCESS] Repaired {len(repairs)} field(s) on "
+                    f"{document_number}: " + "; ".join(repairs)
+                )
+            else:
+                logger.info(f"[REPROCESS] No fiscal detail was missing on {document_number}")
             logger.info(
                 f"[REPROCESS] Recomputed {len(order.lines or [])} line(s); "
                 f"grand_total={order.grand_total}"
             )
         except Exception as e:
-            logger.warning(
-                f"Failed to recompute line amounts for {document_number}: {e}",
+            # Reported as an ERROR, not a warning, and re-raised.
+            #
+            # This used to be swallowed, which made the most consequential phase
+            # of a repair silently optional: the caller got a 200 and an order
+            # that had not been repaired, which reads as "reprocess says it is
+            # fine" when in fact nothing ran. The spreadsheet re-parse above is
+            # still best-effort — a missing or unreadable file is expected and
+            # the repair below does not depend on it — but this phase failing
+            # means the answer the caller got is wrong.
+            logger.error(
+                f"[REPROCESS] Could not repair/recompute {document_number}: {e}",
                 exc_info=True,
             )
+            raise
 
         # Resolve color: use provided color, or fall back to stored value
         if color is not None:
@@ -559,26 +600,41 @@ def create_storefront_order(
             subtotal += line_total
             total_quantities += item.quantity
 
-            order.lines.append(
-                OrderLine(
-                    line_number=idx,
-                    quantity_ordered=item.quantity,
-                    units_ordered=item.quantity,
-                    unit_price=unit_price,
-                    discount=0,
-                    line_total=line_total,
-                    tax=0,
-                    product_id=product.id,
-                )
+            # The line carries the product's fiscal structure, exactly as an
+            # imported line does.
+            #
+            # It used to carry none — no CABYS, no taxes, no unit of measure, no
+            # net price — which had a second, worse consequence than the missing
+            # tax itself: `_recompute_imported_line` returns early on a line with
+            # no structured detail, so Reprocess could never repair a storefront
+            # order either. It was permanently untaxed and permanently
+            # unrepairable, and billing one would have filed a document with no
+            # IVA on it.
+            line = OrderLine(
+                line_number=idx,
+                quantity_ordered=item.quantity,
+                units_ordered=item.quantity,
+                unit_price=unit_price,
+                discount=0,
+                line_total=line_total,
+                tax=0,
+                product_id=product.id,
+                description=product.name,
+                cabys=(product.cabys.code if product.cabys is not None else None),
+                net_price=_imported_line_net_price(None, product) or unit_price,
+                taxes=_imported_line_taxes(product),
+                unit_measure=product.unit_measure,
+                commercial_unit_measure=product.commercial_unit_measure,
+                customs_part=product.customs_part,
+                iva_collected_factory=product.iva_collected_factory,
             )
+            # Price it through the same engine the import and the biller use, so
+            # the storefront total is the one the invoice will charge.
+            _recompute_imported_line(line, product)
+            order.lines.append(line)
 
-        order.subtotal = subtotal
-        order.discounts = 0
-        order.net_total = subtotal
-        order.taxes = 0
-        order.grand_total = subtotal
-        order.total_quantities = total_quantities
-        order.line_count = len(order.lines)
+        # Totals re-added from the priced lines rather than asserted as zero tax.
+        _resum_order_totals(order)
 
         order = repo.save(order)
 
@@ -633,12 +689,52 @@ def _imported_line_taxes(product) -> list | None:
     taxes = getattr(product, "taxes", None)
     if not taxes:
         return None
+    exemption = _product_exemption_row(product)
     out = []
     for t in taxes:
         row = dict(t)
         row.pop("amount", None)
+        # The product's catalog exoneration applies to its IVA, which is the tax
+        # an authorization forgives. Only filled in when the tax row does not
+        # already carry one of its own, and never onto an excise: Nota 10.1
+        # authorizations exonerate VAT, not the specific consumption taxes.
+        if (
+            exemption is not None
+            and not row.get("exemption")
+            and str(row.get("tax_type_id") or "") in _IVA_FAMILY_TAX_CODES
+        ):
+            row["exemption"] = dict(exemption)
         out.append(row)
     return out
+
+
+#: Tax codes an exoneration attaches to (the IVA family).
+_IVA_FAMILY_TAX_CODES = frozenset(
+    {TaxType.IVA.value, TaxType.IVACE.value, TaxType.IVARBU.value}
+)
+
+
+def _product_exemption_row(product) -> dict | None:
+    """The product's catalog exoneration, in the per-tax document shape.
+
+    `Product` carries the exoneration as three flat columns
+    (`exemption_authorization_code`, `exempted_rate`, `exemption_amount`) because
+    it is a property of the ARTICLE — a free-trade-zone good is always exonerated.
+    The document models it per tax, so it is reshaped here.
+
+    `exemption_amount` is deliberately NOT copied: `MontoExonerado` is derived as
+    `tax × percentage / 100` against THIS line's tax, and the product's figure was
+    computed against one unit. Copying it would pin a 23-unit line's exonerated
+    amount to one unit's, the same trap `base_amount` sets.
+    """
+    code = (getattr(product, "exemption_authorization_code", None) or "").strip()
+    if not code:
+        return None
+    rate = getattr(product, "exempted_rate", None)
+    return {
+        "type": code,
+        "percentage": float(rate) if rate is not None else None,
+    }
 
 
 def _imported_line_codes(parsed_line) -> list | None:
@@ -676,11 +772,15 @@ def _imported_line_net_price(parsed_line, product) -> float:
     taxes on the very same product were configured against. The spreadsheet's
     unit price is the fallback — on a chain order it is the negotiated price and
     is already net of tax, which is why it is usable at all.
+
+    `parsed_line` may be None — a storefront line has no spreadsheet behind it,
+    only a catalog product — in which case the catalog net price is the only
+    source and 0 is the honest answer when it is absent.
     """
     catalog_net = getattr(product, "unit_price", None)
     if catalog_net is not None and float(catalog_net) > 0:
         return float(catalog_net)
-    return float(parsed_line.unit_price or 0)
+    return float(getattr(parsed_line, "unit_price", None) or 0)
 
 
 def _allocate_header_discount(parsed) -> dict[int, float]:
@@ -724,6 +824,141 @@ def _allocate_header_discount(parsed) -> dict[int, float]:
     # `allocate_money` rounds each share and gives the remainder to the largest
     # line, so the shares add back to the header amount exactly.
     return {k: float(v) for k, v in allocate_money(header_discount, gross_by_line).items()}
+
+
+def allocate_order_header_discount(order: Order) -> dict[int, float]:
+    """The same allocation, over an ORDER row instead of a parsed spreadsheet.
+
+    Keyed by `line_id`, because a repair works on persisted rows and the
+    spreadsheet that gave them their line numbers is usually long gone.
+
+    This used to be a second implementation living in
+    `scripts/backfill_order_line_calculations.py`, and the two had drifted in
+    exactly the way two copies of a rounding rule do: that one quantized each
+    share at 5 decimal places while this one rounds at 2 via `allocate_money`.
+    Order money is two decimals (TSR-231), so the 5-dp copy produced shares that
+    did not add back to the header at the precision the order is stored in.
+    """
+    header_discount = q_money(order.discounts)
+    lines = list(order.lines or [])
+    if header_discount <= 0 or not lines:
+        return {}
+    if any(float(ln.discount or 0) > 0 for ln in lines):
+        return {}
+
+    gross_by_line = {
+        ln.line_id: q_money(
+            to_decimal(ln.unit_price)
+            * to_decimal(ln.quantity_ordered or ln.units_ordered or 0)
+        )
+        for ln in lines
+    }
+    total_gross = sum(gross_by_line.values())
+    if total_gross <= 0:
+        return {}
+    if header_discount > total_gross:
+        header_discount = total_gross
+
+    return {
+        k: float(v)
+        for k, v in allocate_money(header_discount, gross_by_line).items()
+        if v > 0
+    }
+
+
+def clear_derived_base_amounts(order: Order) -> None:
+    """Undo a `base_amount` copied from the product by an earlier repair run.
+
+    `OrderLine.base_amount` is the editable-base OVERRIDE the calculator prices
+    off, and it is legal only alongside tax code 07 or `IVACobradoFabrica` 01.
+    The PRODUCT column of the same name is a computed OUTPUT (the IVA base at
+    quantity 1), so copying one into the other pins a 23-unit line's tax to one
+    unit's base. Only a manual order legitimately carries an operator-set base,
+    so clearing it on any other source restores the derived base without
+    touching anything a person chose.
+    """
+    if (order.source or "").strip() == MANUAL_ORDER_SOURCE:
+        return
+    for line in (order.lines or []):
+        if line.base_amount is not None:
+            line.base_amount = None
+
+
+def refill_line_fiscal_fields(order: Order) -> list[str]:
+    """Fill in each line's MISSING fiscal detail from its product.
+
+    Returns a human-readable list of what changed, so a repair can say what it
+    did rather than reporting a silent success.
+
+    This is the heart of making "reprocess" a repair rather than a recompute.
+    Recomputing money over lines that carry no tax structure is a no-op — and it
+    was the only thing reprocess did unless the original spreadsheet was still
+    in S3, so the orders that most needed fixing were exactly the ones it
+    skipped.
+
+    It never overwrites a populated field: a hand-edited line's detail is the
+    operator's, not ours to replace. `base_amount` is deliberately not among the
+    fields copied, for the reason in `clear_derived_base_amounts`.
+    """
+    changes: list[str] = []
+    allocated = allocate_order_header_discount(order)
+
+    for line in (order.lines or []):
+        product = line.product
+        where = f"line {line.line_number}"
+
+        if not line.cabys and product is not None and product.cabys:
+            line.cabys = product.cabys.code
+            changes.append(f"{where}: cabys <- {line.cabys}")
+        if line.net_price is None:
+            line.net_price = _imported_line_net_price(line, product)
+            changes.append(f"{where}: net_price <- {line.net_price}")
+        if not line.taxes and product is not None:
+            line.taxes = _imported_line_taxes(product)
+            if line.taxes:
+                changes.append(f"{where}: taxes <- {len(line.taxes)} row(s) from product")
+
+        if product is not None:
+            # Hacienda requires `UnidadMedida` on every line; without it the
+            # invoice falls back to "Unid", wrong for anything sold by weight.
+            if not line.unit_measure and product.unit_measure:
+                line.unit_measure = product.unit_measure
+                changes.append(f"{where}: unit_measure <- {line.unit_measure}")
+            if not line.commercial_unit_measure:
+                line.commercial_unit_measure = product.commercial_unit_measure
+            if not line.customs_part:
+                line.customs_part = product.customs_part
+            if not line.iva_collected_factory and product.iva_collected_factory:
+                line.iva_collected_factory = product.iva_collected_factory
+                changes.append(
+                    f"{where}: iva_collected_factory <- {line.iva_collected_factory}"
+                )
+            if not line.codes and product.codes:
+                # The product's array is the only source for a line imported
+                # before lines carried their own codes.
+                line.codes = [dict(c) for c in product.codes]
+                changes.append(f"{where}: codes <- {len(line.codes)} from product")
+
+        if not line.discounts:
+            amount = float(line.discount or 0) or allocated.get(line.line_id, 0.0)
+            if amount > 0:
+                line.discount = amount
+                line.discounts = _imported_line_discounts(amount)
+                changes.append(f"{where}: discount <- {amount} as 07 Comercial")
+
+        # Repair the rows the line ALREADY has, not only the absent ones.
+        #
+        # A line that copied its taxes from a product back when the product's
+        # rate code was being stripped carries an IVA row with a percentage and a
+        # null code. Filling in missing fields does not touch it, and the moment
+        # `ProductTaxDTO` started rejecting that shape the recompute below could
+        # not even parse the line — so the repair failed on precisely the orders
+        # it exists to repair. Same derivation as the product backfill, and it
+        # refuses to guess a 0% code for the same reason.
+        for repair in repair_tax_rows(line):
+            changes.append(f"{where}: {repair}")
+
+    return changes
 
 
 def _normalize_tax_row(row: dict) -> dict:
@@ -1214,6 +1449,8 @@ def canonical_line_dtos(line) -> tuple[list[ProductDiscountDTO], list[ProductTax
                     if sf is not None
                     else None
                 ),
+                # `Exoneracion` travels per tax, as on the document.
+                exemption=getattr(t, "exemption", None),
                 is_amount=t.rate is None and t.amount is not None,
                 amount=t.amount,
             )
@@ -1363,7 +1600,7 @@ def create_manual_order(
         order = Order(
             company_id=organization_id,
             document_number=document_number,
-            source="manual",
+            source=MANUAL_ORDER_SOURCE,
             document_type=dto.document_type or "PM",
             order_type=order_type,
             order_status=_QUOTE_STATUS if dto.is_quote else _PENDING_STATUS,

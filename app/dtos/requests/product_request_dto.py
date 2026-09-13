@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.dtos.files import ImageDTO
 from app.enums.hacienda_codes import (
     DiscountType,
+    ExemptionCode,
     IvaCollectedFactory,
     TaxRateCode,
     TaxType,
@@ -38,6 +39,68 @@ class TaxRateDTO(BaseModel):
                 f"tax_rate.code {value!r} is not a valid Hacienda Nota 8.1 code."
             )
         return value
+
+
+class ExemptionInstitutionDTO(BaseModel):
+    """Issuing institution of an exoneration (Nota 10.1)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    code: Optional[str] = Field(None, max_length=4)
+    name: Optional[str] = Field(None, max_length=160)
+
+
+class TaxExemptionDTO(BaseModel):
+    """`Exoneracion` on a single tax — mirrors sales-be's `ExemptionDTO`.
+
+    Per-TAX rather than per-line, exactly as the document models it: a line can
+    carry an exonerated IVA alongside a fully-payable excise, and the XML hangs
+    `Exoneracion` off each `Impuesto`.
+
+    The product's own `exemption_authorization_code` / `exempted_rate` /
+    `exemption_amount` columns are the CATALOG default for a product that is
+    always exonerated; they are copied onto the IVA row of an imported line. This
+    DTO is what travels once the exemption is on a line, so an operator can grant
+    one per sale without editing the product.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    #: Nota 10.1 authorization document type (01-11, 99).
+    type: Optional[str] = Field(None, max_length=4)
+    #: Required when type = 99.
+    other_type: Optional[str] = Field(None, max_length=100)
+    number: Optional[str] = Field(None, max_length=40)
+    institution: Optional[ExemptionInstitutionDTO] = Field(None)
+    article: Optional[str] = Field(None, max_length=20)
+    section: Optional[str] = Field(None, max_length=20)
+    issue_date: Optional[str] = Field(None)
+    #: `TarifaExonerada` — the percentage of the tax that is forgiven.
+    percentage: Optional[float] = Field(None, ge=0, le=100)
+    #: `MontoExonerado`. An OUTPUT the biller derives as tax × percentage/100;
+    #: accepted for round-tripping and never trusted as an input.
+    amount: Optional[float] = Field(None, ge=0)
+
+    @field_validator("type")
+    @classmethod
+    def _validate_type(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not str(value).strip():
+            return value
+        allowed = {m.value for m in ExemptionCode}
+        if str(value) not in allowed:
+            raise ValueError(
+                f"exemption.type {value!r} is not a valid Hacienda Nota 10.1 "
+                f"exemption/authorization code."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _require_other_type_for_99(self) -> "TaxExemptionDTO":
+        if (self.type or "").strip() == ExemptionCode.OTHER.value and not (
+            self.other_type or ""
+        ).strip():
+            raise ValueError("exemption.other_type is required when type=99")
+        return self
 
 
 class TaxFactorDTO(BaseModel):
@@ -100,6 +163,13 @@ class ProductDiscountDTO(BaseModel):
         return self
 
 
+#: The IVA family — the codes whose percentage comes from the rate CODE rather
+#: than from a supplied rate (sales-api `TaxService._IVA_CODES`).
+_IVA_FAMILY_CODES = frozenset(
+    {TaxType.IVA.value, TaxType.IVACE.value, TaxType.IVARBU.value}
+)
+
+
 class ProductTaxDTO(BaseModel):
     """Tax input. `amount` is None on inbound requests — the BE calc sets it
     before persistence so the JSONB row carries the computed value.
@@ -120,8 +190,44 @@ class ProductTaxDTO(BaseModel):
     tax_factor: Optional[TaxFactorDTO] = Field(None)
     other_tax_type: Optional[str] = Field(None)
     special_fields: Optional[TaxSpecialFieldsDTO] = Field(None)
+    #: `Exoneracion` for THIS tax. Mirrors the document, where the block hangs
+    #: off each `Impuesto` rather than off the line.
+    exemption: Optional[TaxExemptionDTO] = Field(None)
     is_amount: Optional[bool] = Field(None)
     amount: Optional[float] = Field(None)
+
+    @model_validator(mode="after")
+    def _require_rate_code_for_iva(self) -> "ProductTaxDTO":
+        """An IVA-family tax must carry its Nota 8.1 rate CODE, not just a rate.
+
+        `TaxRateDTO.code` is optional on its own because legacy payloads predate
+        the catalog, but for codes 01 / 07 / 08 it is the only thing that
+        identifies the treatment, and the downstream consequence of omitting it
+        is severe and invisible here:
+
+          * sales-api derives the percentage from the code alone for the IVA
+            family — `tax.rate` is read for nothing — so a tax with a rate and no
+            code cannot be priced, and the document is rejected with
+            `tax.rate_code is required when tax.code='01'`.
+          * an imported order line copies this product's taxes verbatim, so a
+            product saved without the code makes every pedido built from it
+            unbillable, long after the save that caused it.
+          * the percentage cannot stand in for the code: exento (10), no sujeto
+            (11) and crédito pleno (01) are all "0%", so inferring one back from
+            the rate can declare the wrong tax treatment.
+
+        Failing here, at the point the data is entered, is the only place the
+        person who can fix it is present.
+        """
+        if self.tax_type_id not in _IVA_FAMILY_CODES:
+            return self
+        if self.tax_rate is None or not (self.tax_rate.code or "").strip():
+            raise ValueError(
+                f"tax_rate.code (Hacienda Nota 8.1 rate code) is required for "
+                f"tax_type_id {self.tax_type_id!r}; the percentage alone does "
+                f"not identify the tax treatment."
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_special_fields(self) -> "ProductTaxDTO":

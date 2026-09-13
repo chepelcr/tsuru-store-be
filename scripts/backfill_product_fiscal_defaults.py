@@ -45,48 +45,19 @@ import sys
 
 sys.path.insert(0, ".")
 
-from app.enums.hacienda_codes import TaxRateCode, TaxType  # noqa: E402
+from app.utils.product_fiscal_defaults import (  # noqa: E402
+    DEFAULT_UNIT_MEASURE,
+    default_iva_row,
+    repair_tax_rows,
+)
 from app.models.product import Product  # noqa: E402
 from app.repositories.product_repository import ProductRepository  # noqa: E402
 
 logger = logging.getLogger("backfill-products")
 
-#: Hacienda `UnidadMedida` for a discrete article — the right default for a
-#: catalog entry, and the same one the POS form starts from.
-DEFAULT_UNIT_MEASURE = "Unid"
-
-#: General IVA rate. Used when the product has no CABYS to derive one from.
-GENERAL_RATE_CODE = TaxRateCode.GENERAL_13.value
-GENERAL_RATE_PERCENTAGE = 13.0
-
-
-def _iva_row(product: Product) -> dict:
-    """The IVA row this product should carry.
-
-    Prefers the rate on the product's CABYS: that taxonomy exists precisely to
-    say which rate applies, so a reduced or exempt article gets its real rate
-    rather than the general one. Falls back to 13% when there is no CABYS —
-    which is the case for every import-created product.
-    """
-    rate = product.cabys.tax_rate if product.cabys is not None else None
-
-    percentage = (
-        float(rate.percentage)
-        if rate is not None and rate.percentage is not None
-        else GENERAL_RATE_PERCENTAGE
-    )
-    code = (rate.code if rate is not None and rate.code else None) or GENERAL_RATE_CODE
-
-    return {
-        "tax_type_id": TaxType.IVA.value,
-        "tax_rate": {
-            # The CODE is what identifies the treatment; the percentage alone
-            # does not (exento, no sujeto and crédito pleno are all 0%).
-            "id": str(rate.id) if rate is not None and rate.id is not None else None,
-            "percentage": percentage,
-            "code": code,
-        },
-    }
+# The defaults themselves live in `app/utils/product_fiscal_defaults` so this
+# script and the import path that CREATES such products cannot disagree about
+# what a sane default is.
 
 
 def main() -> int:
@@ -117,6 +88,8 @@ def main() -> int:
 
         units_set = 0
         taxes_set = 0
+        rows_repaired = 0
+        needs_attention: list[str] = []
         for product in products:
             changes = []
 
@@ -126,22 +99,46 @@ def main() -> int:
                 changes.append(f"unit={DEFAULT_UNIT_MEASURE}")
 
             if not product.taxes:
-                row = _iva_row(product)
+                row = default_iva_row(product)
                 product.taxes = [row]
                 taxes_set += 1
                 changes.append(
                     f"IVA {row['tax_rate']['percentage']}% (code {row['tax_rate']['code']})"
                 )
+            else:
+                # The larger population: a product that HAS an IVA row whose rate
+                # code is null. Invisible until a document built from it is
+                # rejected — and the reason an order can become unbillable long
+                # after the edit that caused it.
+                repairs = repair_tax_rows(product)
+                if repairs:
+                    rows_repaired += 1
+                    changes.extend(repairs)
+                    for repair in repairs:
+                        if "NEEDS ATTENTION" in repair:
+                            needs_attention.append(
+                                f"{(product.name or product.id)[:40]}: {repair}"
+                            )
 
             if changes:
                 logger.info("  %-40s %s", (product.name or product.id)[:40], ", ".join(changes))
 
         logger.info(
-            "%s: %d unit(s), %d tax row(s).",
+            "%s: %d unit(s), %d new tax row(s), %d product(s) with repaired tax rows.",
             "Committed" if args.apply else "Would write",
             units_set,
             taxes_set,
+            rows_repaired,
         )
+        if needs_attention:
+            logger.warning(
+                "\n%d row(s) could NOT be repaired automatically — a 0%% rate does not "
+                "identify its treatment (exento 10 / no sujeto 11 / crédito pleno 01), "
+                "so guessing one would misdeclare. Set these by hand:",
+                len(needs_attention),
+            )
+            for item in needs_attention:
+                logger.warning("  %s", item)
         if args.apply:
             repo.session.commit()
         else:

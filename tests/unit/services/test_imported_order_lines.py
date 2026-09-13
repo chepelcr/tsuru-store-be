@@ -29,7 +29,8 @@ from app.dtos.requests.product_request_dto import (
     TaxSpecialFieldsDTO,
 )
 from app.enums.hacienda_codes import DiscountType
-from app.enums.hacienda_codes import ProductCodeType
+from app.enums.hacienda_codes import ProductCodeType, TaxType
+from app.utils.product_fiscal_defaults import repair_tax_rows
 from app.services.line_calculation_service import LineCalculator, LineInput
 from app.utils.money import (
     allocate_money,
@@ -55,6 +56,10 @@ _HELPERS = {
     "_line_input_from_structured",
     "_recompute_imported_line",
     "_resum_order_totals",
+    "allocate_order_header_discount",
+    "clear_derived_base_amounts",
+    "refill_line_fiscal_fields",
+    "_product_exemption_row",
 }
 
 
@@ -89,6 +94,12 @@ def _load_helpers() -> dict:
         "round_money": round_money,
         "sum_money": sum_money,
         "to_decimal": to_decimal,
+        "MANUAL_ORDER_SOURCE": "manual",
+        "TaxType": TaxType,
+        "_IVA_FAMILY_TAX_CODES": frozenset(
+            {TaxType.IVA.value, TaxType.IVACE.value, TaxType.IVARBU.value}
+        ),
+        "repair_tax_rows": repair_tax_rows,
     }
     exec(compile(module, "order_service_helpers", "exec"), namespace)
     return namespace
@@ -537,3 +548,275 @@ class TestLineCodes:
         # rows written before the line had a column of its own.
         parsed = Row(internal_code=None, code=None, client_article_code="   ")
         assert helpers["_imported_line_codes"](parsed) is None
+
+class TestFiscalRepair:
+    """`refill_line_fiscal_fields` — what makes Reprocess a repair, not a recompute.
+
+    Recomputing money over a line with no tax structure is a no-op, and that was
+    all Reprocess did unless the original spreadsheet was still in S3. So the
+    orders that most needed fixing — a storefront order, a manual one, or any
+    whose file was deleted — were exactly the ones it skipped.
+    """
+
+    def _product(self, **overrides):
+        base = dict(
+            cabys=Row(code="2718000000100"),
+            unit_measure="Sp",
+            commercial_unit_measure="Lata",
+            customs_part="2203.00.00",
+            iva_collected_factory=None,
+            unit_price=1000.0,
+            codes=[{"code_type_id": "04", "number": "INT-1"}],
+            taxes=[
+                {
+                    "tax_type_id": "01",
+                    "tax_rate": {"id": "8", "percentage": 13.0, "code": "08"},
+                }
+            ],
+        )
+        base.update(overrides)
+        return Row(**base)
+
+    def _bare_line(self, product, **overrides):
+        """A line as an older import left it: money only, no fiscal structure."""
+        base = dict(
+            line_id=1,
+            line_number=1,
+            quantity_ordered=10,
+            units_ordered=10,
+            unit_price=1000.0,
+            net_price=None,
+            cabys=None,
+            taxes=None,
+            discounts=None,
+            codes=None,
+            unit_measure=None,
+            commercial_unit_measure=None,
+            customs_part=None,
+            iva_collected_factory=None,
+            base_amount=None,
+            discount=0.0,
+            tax=0.0,
+            line_total=0.0,
+            product=product,
+        )
+        base.update(overrides)
+        return Row(**base)
+
+    def test_fills_cabys_taxes_and_unit_from_the_product(self) -> None:
+        product = self._product()
+        line = self._bare_line(product)
+        order = Row(source="import", discounts=0.0, lines=[line])
+
+        changes = helpers["refill_line_fiscal_fields"](order)
+
+        assert line.cabys == "2718000000100"
+        # Without a unit Hacienda's line falls back to "Unid", wrong for
+        # anything sold by weight or volume.
+        assert line.unit_measure == "Sp"
+        assert line.net_price == 1000.0
+        # The rate CODE must come across, not just the percentage — sales-api
+        # derives the rate from the code alone for the IVA family.
+        assert line.taxes[0]["tax_rate"]["code"] == "08"
+        assert changes, "a repair that changed something must say so"
+
+    def test_never_overwrites_what_the_line_already_has(self) -> None:
+        # A hand-edited line's detail is the operator's, not ours to replace.
+        product = self._product()
+        line = self._bare_line(
+            product,
+            cabys="9999999999999",
+            unit_measure="kg",
+            taxes=[{"tax_type_id": "02", "tax_rate": {"percentage": 10.0, "code": "08"}}],
+        )
+        order = Row(source="import", discounts=0.0, lines=[line])
+
+        helpers["refill_line_fiscal_fields"](order)
+
+        assert line.cabys == "9999999999999"
+        assert line.unit_measure == "kg"
+        assert line.taxes[0]["tax_type_id"] == "02"
+
+    def test_reports_nothing_when_nothing_was_missing(self) -> None:
+        product = self._product()
+        line = self._bare_line(
+            product,
+            cabys="2718000000100",
+            net_price=1000.0,
+            unit_measure="Sp",
+            taxes=product.taxes,
+            codes=product.codes,
+            discounts=[],
+            discount=0.0,
+        )
+        order = Row(source="import", discounts=0.0, lines=[line])
+        assert helpers["refill_line_fiscal_fields"](order) == []
+
+    def test_allocates_a_header_discount_the_lines_do_not_carry(self) -> None:
+        product = self._product()
+        a = self._bare_line(product, line_id=1, line_number=1, unit_price=1000.0)
+        b = self._bare_line(product, line_id=2, line_number=2, unit_price=3000.0)
+        order = Row(source="import", discounts=400.0, lines=[a, b])
+
+        helpers["refill_line_fiscal_fields"](order)
+
+        # Pro-rata on gross: 10 000 and 30 000 → 25% / 75% of 400.
+        assert a.discount == 100.0
+        assert b.discount == 300.0
+        assert a.discounts[0]["discount_type_id"] == "07"
+
+    def test_allocation_rounds_at_two_decimals_like_order_money(self) -> None:
+        # The backfill script used to quantize this at 5 dp while the service
+        # rounded at 2, so a repaired order's line discounts did not add back to
+        # its header at the precision order money is stored in.
+        product = self._product()
+        lines = [
+            self._bare_line(product, line_id=i, line_number=i, unit_price=1000.0)
+            for i in (1, 2, 3)
+        ]
+        order = Row(source="import", discounts=100.0, lines=lines)
+
+        shares = helpers["allocate_order_header_discount"](order)
+
+        assert sum(shares.values()) == 100.0
+        for value in shares.values():
+            assert round(value, 2) == value
+
+    def test_repairs_a_stored_line_tax_that_lost_its_rate_code(self) -> None:
+        """The case that blocked the repair on the very orders it exists for.
+
+        A line that copied its taxes from a product back when the save path was
+        stripping the rate code carries an IVA row with a percentage and a null
+        code. Filling in *missing* fields never touched it, and once
+        `ProductTaxDTO` began rejecting that shape the recompute could not parse
+        the line at all — so the backfill failed on exactly those orders.
+        """
+        product = self._product()
+        line = self._bare_line(
+            product,
+            cabys="2718000000100",
+            net_price=1000.0,
+            unit_measure="Sp",
+            # No `code` on the rate — the poisoned shape.
+            taxes=[{"tax_type_id": "01", "tax_rate": {"id": "8", "percentage": 13.0}}],
+            codes=product.codes,
+            discounts=[],
+        )
+        order = Row(source="import", discounts=0.0, lines=[line])
+
+        changes = helpers["refill_line_fiscal_fields"](order)
+
+        assert line.taxes[0]["tax_rate"]["code"] == "08"
+        assert any("rate code <- 08" in c for c in changes)
+
+    def test_does_not_guess_a_rate_code_for_a_zero_percent_line(self) -> None:
+        # Exento (10), no sujeto (11) and crédito pleno (01) are all 0%, so the
+        # repair reports it instead of picking one.
+        product = self._product()
+        line = self._bare_line(
+            product,
+            cabys="2718000000100",
+            net_price=1000.0,
+            unit_measure="Sp",
+            taxes=[{"tax_type_id": "01", "tax_rate": {"percentage": 0.0}}],
+            codes=product.codes,
+            discounts=[],
+        )
+        order = Row(source="import", discounts=0.0, lines=[line])
+
+        changes = helpers["refill_line_fiscal_fields"](order)
+
+        assert "code" not in line.taxes[0]["tax_rate"]
+        assert any("NEEDS ATTENTION" in c for c in changes)
+
+    def test_leaves_line_discounts_alone_when_they_declare_their_own(self) -> None:
+        product = self._product()
+        line = self._bare_line(product, discount=250.0)
+        order = Row(source="import", discounts=400.0, lines=[line])
+        assert helpers["allocate_order_header_discount"](order) == {}
+
+
+class TestDerivedBaseAmountClearing:
+    """`base_amount` is the editable-base OVERRIDE, not a derived figure."""
+
+    def test_clears_a_copied_base_on_an_imported_order(self) -> None:
+        line = Row(base_amount=1000.0)
+        order = Row(source="import", lines=[line])
+        helpers["clear_derived_base_amounts"](order)
+        assert line.base_amount is None
+
+    def test_leaves_a_manual_order_alone(self) -> None:
+        # Only a manual order legitimately carries an operator-set base, for tax
+        # code 07 or IVACobradoFabrica 01.
+        line = Row(base_amount=5000.0)
+        order = Row(source="manual", lines=[line])
+        helpers["clear_derived_base_amounts"](order)
+        assert line.base_amount == 5000.0
+
+class TestProductExonerationOnImportedLines:
+    """A product's catalog exoneration reaches the line's IVA row.
+
+    `Product` stores the exoneration as three flat columns because it is a
+    property of the ARTICLE — a free-trade-zone good is always exonerated — while
+    the document hangs `Exoneracion` off each `Impuesto`. This is the reshape.
+    """
+
+    def _product(self, **overrides):
+        base = dict(
+            exemption_authorization_code="08",
+            exempted_rate=100.0,
+            exemption_amount=130.0,
+            taxes=[
+                {
+                    "tax_type_id": "01",
+                    "tax_rate": {"id": "8", "percentage": 13.0, "code": "08"},
+                }
+            ],
+        )
+        base.update(overrides)
+        return Row(**base)
+
+    def test_copies_the_authorization_and_rate_onto_the_iva_row(self) -> None:
+        out = helpers["_imported_line_taxes"](self._product())
+        assert out[0]["exemption"] == {"type": "08", "percentage": 100.0}
+
+    def test_does_not_copy_the_amount(self) -> None:
+        # `MontoExonerado` is derived as tax x percentage/100 against THIS line's
+        # tax. The product's figure was computed against one unit, so carrying it
+        # would pin a 23-unit line's exonerated amount to one unit's — the same
+        # trap `base_amount` sets.
+        out = helpers["_imported_line_taxes"](self._product())
+        assert "amount" not in out[0]["exemption"]
+
+    def test_never_attaches_an_exoneration_to_an_excise(self) -> None:
+        # Nota 10.1 authorizations forgive VAT, not the specific consumption
+        # taxes, so an ISEBA row must come through untouched.
+        product = self._product(
+            taxes=[
+                {"tax_type_id": "04", "special_fields": {"quantity": 0.355}},
+                {"tax_type_id": "01", "tax_rate": {"percentage": 13.0, "code": "08"}},
+            ]
+        )
+        out = helpers["_imported_line_taxes"](product)
+        assert "exemption" not in out[0]
+        assert out[1]["exemption"]["type"] == "08"
+
+    def test_leaves_an_exoneration_the_tax_row_already_carries(self) -> None:
+        product = self._product(
+            taxes=[
+                {
+                    "tax_type_id": "01",
+                    "tax_rate": {"percentage": 13.0, "code": "08"},
+                    "exemption": {"type": "02", "percentage": 50.0},
+                }
+            ]
+        )
+        out = helpers["_imported_line_taxes"](product)
+        assert out[0]["exemption"] == {"type": "02", "percentage": 50.0}
+
+    def test_no_exoneration_when_the_product_has_no_authorization(self) -> None:
+        product = self._product(exemption_authorization_code=None)
+        out = helpers["_imported_line_taxes"](product)
+        assert "exemption" not in out[0]
+        assert helpers["_product_exemption_row"](product) is None
+

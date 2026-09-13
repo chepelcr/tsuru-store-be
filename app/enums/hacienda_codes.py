@@ -71,6 +71,43 @@ class TaxRateCode(str, Enum):
     NOT_SUBJECT = "11"                 # 0% — no sujeto, sin derecho de crédito
 
 
+class ExemptionCode(str, Enum):
+    """Exemption / authorization document types per Hacienda Nota 10.1.
+
+    Not to be confused with the reference ACTION codes (Anula / Corrige /
+    Sustituye…), which are a different two-digit table on the same document. The
+    POS had these two tables under one name until TSR-126.
+
+    Two of these are **LOCAL** authorizations — 04 and 11 — and a Factura
+    granting one MUST also carry an `InformacionReferencia`, per the analysis
+    doc's "Obligatorio en … FE con exoneraciones locales".
+    """
+
+    DGT_AUTHORIZED_PURCHASE = "01"          # Exclusive use NC/ND
+    DIPLOMAT_EXEMPTION = "02"
+    SPECIAL_LAW_AUTHORIZATION = "03"
+    DGH_GENERIC_LOCAL_EXEMPTION = "04"      # LOCAL
+    TRANSITIONAL_ARCHITECTURE = "05"        # NC/ND only
+    TRANSITIONAL_ICT = "06"                 # NC/ND only
+    TRANSITIONAL_RECYCLING = "07"           # NC/ND only
+    FREE_TRADE_ZONE = "08"
+    COMPLEMENTARY_EXPORT_SERVICES = "09"
+    MUNICIPAL_CORPORATION_BODY = "10"
+    DGH_SPECIFIC_LOCAL_EXEMPTION = "11"     # LOCAL
+    OTHER = "99"
+
+
+#: Nota 10.1 codes that are LOCAL authorizations, which pull a mandatory
+#: `InformacionReferencia` onto a Factura. Mirrors sales-be's
+#: `LOCAL_EXEMPTION_CODES`.
+LOCAL_EXEMPTION_CODES = frozenset(
+    {
+        ExemptionCode.DGH_GENERIC_LOCAL_EXEMPTION.value,
+        ExemptionCode.DGH_SPECIFIC_LOCAL_EXEMPTION.value,
+    }
+)
+
+
 class IvaCollectedFactory(str, Enum):
     """`IVACobradoFabrica` indicator per Hacienda v4.4."""
 
