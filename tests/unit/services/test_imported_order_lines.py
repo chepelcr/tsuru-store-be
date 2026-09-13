@@ -569,8 +569,9 @@ class TestFiscalRepair:
             codes=[{"code_type_id": "04", "number": "INT-1"}],
             taxes=[
                 {
+                    # `id` is the Hacienda rate CODE, not a data-services row id.
                     "tax_type_id": "01",
-                    "tax_rate": {"id": "8", "percentage": 13.0, "code": "08"},
+                    "tax_rate": {"id": "08", "percentage": 13.0, "code": "08"},
                 }
             ],
         )
@@ -768,8 +769,9 @@ class TestProductExonerationOnImportedLines:
             exemption_amount=130.0,
             taxes=[
                 {
+                    # `id` is the Hacienda rate CODE, not a data-services row id.
                     "tax_type_id": "01",
-                    "tax_rate": {"id": "8", "percentage": 13.0, "code": "08"},
+                    "tax_rate": {"id": "08", "percentage": 13.0, "code": "08"},
                 }
             ],
         )

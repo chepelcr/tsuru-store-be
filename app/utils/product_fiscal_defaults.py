@@ -58,7 +58,12 @@ def default_iva_row(product) -> dict:
     return {
         "tax_type_id": TaxType.IVA.value,
         "tax_rate": {
-            "id": str(rate.id) if rate is not None and rate.id is not None else None,
+            # `id` carries the Hacienda rate CODE, not the data-services row id.
+            # The code identifies the treatment and is what the document
+            # carries; the row id is environment-specific and a reseed can
+            # renumber it. `_normalize_tax_row` has always read this field as
+            # the rate code, so writing a row id here made the two disagree.
+            "id": code,
             "percentage": percentage,
             "code": code,
         },
@@ -122,10 +127,22 @@ def repair_tax_rows(product) -> list[str]:
             existing_code = (rate.get("code") or "").strip()
             percentage = rate.get("percentage")
 
+            # `id` must be the rate CODE. Rows written earlier hold a
+            # data-services row id ("8") where the code ("08") belongs, and the
+            # product form bound its rate selector to that id — so a row with a
+            # code but no id, which is most of them, rendered as unselected.
+            previous_id = rate.get("id")
+            if existing_code and str(previous_id or "") != existing_code:
+                rate["id"] = existing_code
+                changes.append(
+                    f"tax {code}: rate id <- {existing_code} (was {previous_id!r})"
+                )
+
             if not existing_code and percentage is not None:
                 derived = code_by_percentage.get(float(percentage))
                 if derived:
                     rate["code"] = derived
+                    rate["id"] = derived
                     changes.append(f"tax {code}: rate code <- {derived} (from {percentage}%)")
                 else:
                     # 0% and anything unrecognised. Reported, not guessed.

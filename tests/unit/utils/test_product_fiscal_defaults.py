@@ -36,7 +36,16 @@ class TestDefaultIvaRow:
         # reduced or exempt article gets its real rate rather than the general one.
         cabys = _Row(tax_rate=_Row(id=4, percentage=4.0, code="04"))
         row = default_iva_row(_product(cabys=cabys))
-        assert row["tax_rate"] == {"id": "4", "percentage": 4.0, "code": "04"}
+        # `id` is the Hacienda rate CODE, not the data-services row id (4).
+        assert row["tax_rate"] == {"id": "04", "percentage": 4.0, "code": "04"}
+
+    def test_id_is_never_a_data_services_row_id(self) -> None:
+        # The row id is environment-specific — a reseed renumbers it — and means
+        # nothing to Hacienda. Same class of bug as sending DB id "17" as a
+        # discount_type_id.
+        cabys = _Row(tax_rate=_Row(id=8, percentage=13.0, code="08"))
+        row = default_iva_row(_product(cabys=cabys))
+        assert row["tax_rate"]["id"] == row["tax_rate"]["code"] == "08"
 
     def test_always_carries_a_code_even_when_the_cabys_lacks_one(self) -> None:
         cabys = _Row(tax_rate=_Row(id=None, percentage=13.0, code=None))
@@ -53,7 +62,33 @@ class TestRepairTaxRows:
         product = _product(taxes=[{"tax_type_id": "01", "tax_rate": {"percentage": 13.0}}])
         changes = repair_tax_rows(product)
         assert product.taxes[0]["tax_rate"]["code"] == "08"
+        # `id` is set to the code at the same time, not left absent.
+        assert product.taxes[0]["tax_rate"]["id"] == "08"
         assert changes and "rate code <- 08" in changes[0]
+
+    def test_rewrites_a_data_services_row_id_to_the_rate_code(self) -> None:
+        # Rows written before this held the catalog row id ("8") where the
+        # Nota 8.1 code ("08") belongs, and the product form bound its rate
+        # selector to that id.
+        product = _product(
+            taxes=[{"tax_type_id": "01", "tax_rate": {"id": "8", "code": "08", "percentage": 13.0}}]
+        )
+        changes = repair_tax_rows(product)
+        assert product.taxes[0]["tax_rate"]["id"] == "08"
+        assert any("rate id <- 08" in c for c in changes)
+
+    def test_fills_an_absent_id_from_the_code(self) -> None:
+        product = _product(
+            taxes=[{"tax_type_id": "01", "tax_rate": {"id": None, "code": "08", "percentage": 13.0}}]
+        )
+        repair_tax_rows(product)
+        assert product.taxes[0]["tax_rate"]["id"] == "08"
+
+    def test_a_row_already_correct_reports_no_change(self) -> None:
+        product = _product(
+            taxes=[{"tax_type_id": "01", "tax_rate": {"id": "08", "code": "08", "percentage": 13.0}}]
+        )
+        assert repair_tax_rows(product) == []
 
     def test_derives_each_unambiguous_percentage(self) -> None:
         for percentage, code in ((0.5, "09"), (1.0, "02"), (2.0, "03"), (4.0, "04"), (13.0, "08")):
@@ -71,8 +106,10 @@ class TestRepairTaxRows:
         assert changes and "NEEDS ATTENTION" in changes[0]
 
     def test_never_overwrites_a_code_the_row_already_has(self) -> None:
+        # 13% carrying an explicit "exenta" code is odd but it is the
+        # operator's, and only the `id` is brought into line with it.
         product = _product(
-            taxes=[{"tax_type_id": "01", "tax_rate": {"percentage": 13.0, "code": "10"}}]
+            taxes=[{"tax_type_id": "01", "tax_rate": {"id": "10", "percentage": 13.0, "code": "10"}}]
         )
         assert repair_tax_rows(product) == []
         assert product.taxes[0]["tax_rate"]["code"] == "10"
