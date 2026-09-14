@@ -1420,7 +1420,18 @@ def canonical_line_dtos(line) -> tuple[list[ProductDiscountDTO], list[ProductTax
             ProductTaxDTO(
                 tax_type_id=t.code or "01",
                 tax_rate=(
-                    TaxRateDTO(percentage=t.rate, code=t.rate_code)
+                    # `id` carries the Hacienda rate CODE, not a data-services
+                    # row id — a reseed renumbers those, and the POS product
+                    # form binds its rate selector to this field. The repair
+                    # tool and the legacy-row normalizer both already write the
+                    # code here; this builder left it null, so a manual order
+                    # created today disagreed with the same order after a
+                    # backfill.
+                    TaxRateDTO(
+                        id=t.rate_code,
+                        percentage=t.rate,
+                        code=t.rate_code,
+                    )
                     if t.rate is not None
                     else None
                 ),
