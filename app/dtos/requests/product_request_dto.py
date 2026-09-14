@@ -169,6 +169,16 @@ _IVA_FAMILY_CODES = frozenset(
     {TaxType.IVA.value, TaxType.IVACE.value, TaxType.IVARBU.value}
 )
 
+#: Transitional rate codes (Nota 8.1) — legal only on a credit or debit note.
+#: Mirrors sales-be's `_TRANSITIONAL_RATE_CODES` in `tax_validator.py`.
+_NC_ND_ONLY_RATE_CODES = frozenset(
+    {
+        TaxRateCode.TRANSITIONAL_0.value,
+        TaxRateCode.TRANSITIONAL_4.value,
+        TaxRateCode.TRANSITIONAL_8.value,
+    }
+)
+
 
 class ProductTaxDTO(BaseModel):
     """Tax input. `amount` is None on inbound requests — the BE calc sets it
@@ -195,6 +205,42 @@ class ProductTaxDTO(BaseModel):
     exemption: Optional[TaxExemptionDTO] = Field(None)
     is_amount: Optional[bool] = Field(None)
     amount: Optional[float] = Field(None)
+
+    @field_validator("tax_type_id")
+    @classmethod
+    def _validate_tax_type(cls, value: str) -> str:
+        """Reject a tax code Hacienda does not define.
+
+        sales-be raises `Invalid tax.code` for anything outside `TaxType`, so a
+        product saved with a typo here is a product every document built from it
+        will be rejected for — long after the save that caused it.
+        """
+        allowed = {m.value for m in TaxType}
+        if value not in allowed:
+            raise ValueError(
+                f"tax_type_id {value!r} is not a valid Hacienda tax code."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def _require_factor_for_used_goods(self) -> "ProductTaxDTO":
+        """Code 08 (IVA Régimen de Bienes Usados) is priced from its FACTOR.
+
+        `tax = subtotal x factor`, so a code-08 tax with no factor computes zero
+        tax — on screen and on the document. sales-be rejects it
+        (`tax.factor is required when tax.code=08`); rejecting it at save time is
+        the only place the person who can supply it is present.
+        """
+        if self.tax_type_id != TaxType.IVARBU.value:
+            return self
+        factor = getattr(self.tax_factor, "factor", None) if self.tax_factor else None
+        if factor is None:
+            raise ValueError(
+                "tax_factor.factor is required for tax_type_id '08' "
+                "(IVA Régimen de Bienes Usados); the tax is computed as "
+                "subtotal x factor, so without it the line is taxed at zero."
+            )
+        return self
 
     @model_validator(mode="after")
     def _require_rate_code_for_iva(self) -> "ProductTaxDTO":
@@ -227,6 +273,17 @@ class ProductTaxDTO(BaseModel):
                 f"tax_type_id {self.tax_type_id!r}; the percentage alone does "
                 f"not identify the tax treatment."
             )
+        # The transitional rates correct documents issued under the previous
+        # schedule, so sales-be accepts them only on a credit or debit note
+        # (`HACIENDA_TAX_RATE_CODE_NC_ND_ONLY`). A product is not a document: a
+        # default rate that only a corrective note may carry guarantees a
+        # rejection on the first invoice the product appears on.
+        if (self.tax_rate.code or "").strip() in _NC_ND_ONLY_RATE_CODES:
+            raise ValueError(
+                f"tax_rate.code {self.tax_rate.code!r} is a transitional rate "
+                f"reserved for credit and debit notes; a product cannot default "
+                f"to it."
+            )
         return self
 
     @model_validator(mode="after")
@@ -237,6 +294,12 @@ class ProductTaxDTO(BaseModel):
             TaxType.IUC.value: ("quantity", "tax_amount_id"),
             TaxType.IPT.value: ("quantity", "tax_amount_id"),
             TaxType.ISEC.value: ("quantity", "tax_amount_id"),
+            # NOT `proportion`: that is DERIVED, not stored.
+            # `TaxCalculationService` computes it as `quantity x percentage / 100`
+            # (the volume times the alcohol degree) and Hacienda recomputes the
+            # amount from it. The product supplies the two inputs; requiring the
+            # output here would ask the catalogue for a number only the line can
+            # produce.
             TaxType.ISEBA.value: ("quantity", "percentage", "tax_amount_id"),
             TaxType.ISEBEC.value: (
                 "quantity",
@@ -356,3 +419,57 @@ class ProductRequestDTO(BaseModel):
                 f"iva_collected_factory {value!r} not in IvaCollectedFactory enum."
             )
         return value
+
+    @model_validator(mode="after")
+    def _validate_tax_and_discount_set(self) -> "ProductRequestDTO":
+        """Product-level rules sales-be applies per document line.
+
+        These two cannot be checked on a single tax or discount — they are
+        properties of the SET — and both are cheap here and expensive later.
+
+        **One IVA per product.** Hacienda allows at most one IVA-family tax on a
+        line ("Only one IVA tax (code 01 or 08) is allowed per line"). A product
+        carrying two produces a line that can never be filed, and the second one
+        is invisible until a document is built from it.
+
+        **Free goods must be 100%.** Natures 01 (Regalía) and 03 (Bonificación)
+        ARE free goods; Hacienda answers **-518** when the discount is not the
+        full line amount, and sales-be rejects it as
+        `HACIENDA_DISCOUNT_FREE_GOODS_NOT_FULL`. A product saved with a partial
+        regalía looks perfectly reasonable in the catalogue and fails at
+        emission — which is exactly the trap this validator exists to close.
+        Percentages CASCADE, so the check is on what the cascade leaves: a
+        single 100% discount, or a set that reaches 100% together.
+        """
+        taxes = self.taxes or []
+        iva = [t for t in taxes if t.tax_type_id in _IVA_FAMILY_CODES]
+        if len(iva) > 1:
+            raise ValueError(
+                "Only one IVA-family tax (01, 07 or 08) is allowed per product; "
+                f"got {[t.tax_type_id for t in iva]}."
+            )
+
+        discounts = self.discounts or []
+        free_goods = {DiscountType.ROYALTY.value, DiscountType.BONUS.value}
+        if not any((d.discount_type_id or "").strip() in free_goods for d in discounts):
+            return self
+
+        # What the cascade actually removes, as a fraction of the line: each
+        # discount applies to the balance the previous one left.
+        remaining = 1.0
+        for d in discounts:
+            pct = d.percentage
+            if pct is None:
+                # An absolute amount cannot be checked without a price here;
+                # sales-be still validates it against the real line total.
+                return self
+            remaining *= 1.0 - (float(pct) / 100.0)
+        applied = 1.0 - remaining
+        if abs(applied - 1.0) > 1e-9:
+            raise ValueError(
+                "Discount codes 01 (Regalía) and 03 (Bonificación) are free "
+                "goods: the discounts must remove 100% of the line, got "
+                f"{applied * 100:.5g}%. Hacienda rejects a partial regalía "
+                "with -518."
+            )
+        return self
