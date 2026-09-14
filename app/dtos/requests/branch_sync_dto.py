@@ -13,22 +13,22 @@ class SyncDTO(BaseModel):
 
 
 class BranchPhoneDTO(SyncDTO):
-    country_code: Optional[Union[str, int]] = Field(None, alias="countryCode")
+    country_code: Optional[Union[str, int]] = Field(None)
     number: Optional[Union[str, int]] = None
 
 
 class BranchResidenceDTO(SyncDTO):
-    country_code: Optional[Union[str, int]] = Field(None, alias="countryCode")
-    province_code: Optional[int] = Field(None, alias="provinceCode", ge=1)
-    canton_code: Optional[int] = Field(None, alias="cantonCode", ge=1)
-    district_code: Optional[int] = Field(None, alias="districtCode", ge=1)
-    neighborhood_code: Optional[int] = Field(None, alias="neighborhoodCode", ge=1)
+    country_code: Optional[Union[str, int]] = Field(None)
+    province_code: Optional[int] = Field(None, ge=1)
+    canton_code: Optional[int] = Field(None, ge=1)
+    district_code: Optional[int] = Field(None, ge=1)
+    neighborhood_code: Optional[int] = Field(None, ge=1)
     address: Optional[str] = None
 
 
 class BranchConsecutiveDTO(SyncDTO):
-    document_type: str = Field(alias="documentType", pattern=r"^[0-9]{2}$")
-    current_number: int = Field(alias="currentNumber", ge=0, le=9999999999, strict=True)
+    document_type: str = Field(pattern=r"^[0-9]{2}$")
+    current_number: int = Field(ge=0, le=9999999999, strict=True)
 
 
 class BranchTerminalDTO(SyncDTO):
@@ -47,13 +47,15 @@ class BranchSyncDTO(SyncDTO):
 
 
 class OrganizationBranchesPayload(SyncDTO):
-    organization_id: str = Field(alias="organizationId", min_length=1, max_length=255)
+    organization_id: str = Field(min_length=1, max_length=255)
     branches: list[BranchSyncDTO]
 
 
 class OrganizationBranchesEvent(SyncDTO):
     id: str = Field(min_length=1)
-    occurred_at: datetime = Field(alias="occurredAt")
+    occurred_at: datetime
+    # The one alias that stays: `_type` is a discriminator, not a data field,
+    # and a leading underscore cannot be a pydantic attribute name.
     type_: Literal["OrganizationBranchesEvent"] = Field(alias="_type")
-    event_type: Literal["SAVE_BRANCHES"] = Field(alias="eventType")
+    event_type: Literal["SAVE_BRANCHES"]
     data: OrganizationBranchesPayload

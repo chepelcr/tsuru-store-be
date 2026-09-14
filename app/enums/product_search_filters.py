@@ -23,7 +23,7 @@ class ProductSearchFilters(BaseSearchFilter):
     CATEGORY_NAME = ("name", "category_name", True, "category", True, ENTITY_ALL, True, False, False, True)
     STATUS = ("status", "status", False, None, True, ENTITY_ALL, False, False, False, False)
     TYPE = ("type", "type", False, None, True, ENTITY_ALL, False, False, False, False)
-    IS_OFFER = ("is_offer", "isOffer", False, None, True, ENTITY_ALL, False, False, False, False)
+    IS_OFFER = ("is_offer", "is_offer", False, None, True, ENTITY_ALL, False, False, False, False)
     PRICE = ("price", "price", False, None, True, ENTITY_ALL, False, True, True, False)
     SALE_PRICE = ("sale_price", "sale_price", False, None, True, ENTITY_ALL, False, True, True, False)
     CREATED_ON = ("created_on", "created_on", False, None, True, ENTITY_ALL, False, False, True, False)

@@ -9,16 +9,16 @@ from app.handlers.sqs_handler import SqsHandler
 def event_payload(**overrides):
     return {
         "id": "event-1",
-        "occurredAt": "2026-09-11T18:00:00Z",
+        "occurred_at": "2026-09-11T18:00:00Z",
         "_type": "OrganizationBranchesEvent",
-        "eventType": "SAVE_BRANCHES",
+        "event_type": "SAVE_BRANCHES",
         "data": {
-            "organizationId": "org-1",
+            "organization_id": "org-1",
             "branches": [{
                 "number": 1,
                 "terminals": [{
                     "number": 1,
-                    "consecutives": [{"documentType": "01", "currentNumber": 42}],
+                    "consecutives": [{"document_type": "01", "current_number": 42}],
                 }],
             }],
         },
@@ -64,12 +64,12 @@ def test_partial_batch_failure_retries_only_failed_messages():
 @pytest.mark.parametrize("body", [
     [],
     {"Type": "Notification", "Message": "not json"},
-    event_payload(eventType="UNKNOWN"),
-    event_payload(data={"organizationId": "org-1", "branches": [{"number": True}]}),
-    event_payload(data={"organizationId": "", "branches": []}),
-    event_payload(data={"organizationId": "org-1", "branches": [{
+    event_payload(event_type="UNKNOWN"),
+    event_payload(data={"organization_id": "org-1", "branches": [{"number": True}]}),
+    event_payload(data={"organization_id": "", "branches": []}),
+    event_payload(data={"organization_id": "org-1", "branches": [{
         "number": 1, "terminals": [{"number": 1, "consecutives": [{
-            "documentType": "01", "currentNumber": -1,
+            "document_type": "01", "current_number": -1,
         }]}],
     }]}),
 ])

@@ -12,4 +12,4 @@ class FileDTO(BaseModel):
 
     data: str = Field(..., description="Base64-encoded file data")
     name: Optional[str] = Field(None, description="Filename (e.g., file.ext)")
-    content_type: Optional[str] = Field(None, alias="contentType", description="MIME type (e.g., image/png)")
+    content_type: Optional[str] = Field(None, description="MIME type (e.g., image/png)")

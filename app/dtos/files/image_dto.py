@@ -10,6 +10,5 @@ class ImageDTO(FileDTO):
 
     content_type: str = Field(
         ...,
-        alias="contentType",
         description="Image MIME type (e.g., image/png, image/jpeg, image/gif, image/webp)",
     )

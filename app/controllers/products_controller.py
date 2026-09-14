@@ -33,39 +33,39 @@ class ProductsController:
   - Format with code type: `code:01-123415` (searches for code_type_id "01" and number "123415")
   - Format without code type: `code:123415` (searches all code types for number "123415")
 - `name`: Product name (supports wildcards)
-- `categoryId`: Filter by category ID (exact match)
-- `categoryName`: Filter by category name (supports wildcards)
+- `category_id`: Filter by category ID (exact match)
+- `category_name`: Filter by category name (supports wildcards)
 - `status`: Filter by product status (1=Active, 2=Inactive, 3=Deleted)
 - `type`: Filter by product kind (`type:product`, `type:service`, `type:program`)
-- `isOffer`: Filter by storefront "Oferta" flag (`isOffer:true` / `isOffer:false`)
+- `is_offer`: Filter by storefront "Oferta" flag (`is_offer:true` / `is_offer:false`)
 - `price`: Filter by net price (supports between with `~`)
   - Single value: `price:100` (exact match)
   - Range: `price:50~150` (between 50 and 150)
   - Greater than: `price>100`
   - Less than: `price<100`
-- `salePrice`: Filter by sale price (supports between with `~`)
-  - Single value: `salePrice:100` (exact match)
-  - Range: `salePrice:50~150` (between 50 and 150)
-  - Greater than: `salePrice>100`
-  - Less than: `salePrice<100`
+- `sale_price`: Filter by sale price (supports between with `~`)
+  - Single value: `sale_price:100` (exact match)
+  - Range: `sale_price:50~150` (between 50 and 150)
+  - Greater than: `sale_price>100`
+  - Less than: `sale_price<100`
 
 **Sorting**
-- `orderBy>field` (Ascending)
-- `orderBy<field` (Descending)
-- Sortable fields: `description`, `name`, `price`, `salePrice`, `createdOn`, `updatedOn`
+- `order_by>field` (Ascending)
+- `order_by<field` (Descending)
+- Sortable fields: `description`, `name`, `price`, `sale_price`, `created_on`, `updated_on`
 
 **Examples:**
-- `name:*shampoo*,orderBy>name` - Products with "shampoo" in name, sorted by name
-- `categoryId:cat-123` - Products in specific category
-- `categoryName:*electronics*,status:1` - Active products in electronics category
+- `name:*shampoo*,order_by>name` - Products with "shampoo" in name, sorted by name
+- `category_id:cat-123` - Products in specific category
+- `category_name:*electronics*,status:1` - Active products in electronics category
 - `status:2` - Inactive products
 - `status:1` - Active products only
-- `type:product,isOffer:true` - Products flagged as offers (storefront "Ofertas")
+- `type:product,is_offer:true` - Products flagged as offers (storefront "Ofertas")
 - `type:program` - Programs only
 - `price:50~150` - Products with net price between 50 and 150
-- `salePrice:50~150` - Products with sale price between 50 and 150
-- `price>100,orderBy>price` - Products over 100, sorted by net price
-- `categoryName:*beauty*,salePrice<50,orderBy>salePrice` - Beauty products under 50, sorted by sale price
+- `sale_price:50~150` - Products with sale price between 50 and 150
+- `price>100,order_by>price` - Products over 100, sorted by net price
+- `category_name:*beauty*,sale_price<50,order_by>sale_price` - Beauty products under 50, sorted by sale price
 """,
         )
         async def list_products(
@@ -75,7 +75,7 @@ class ProductsController:
                 description=(
                     "Search filter string. Syntax: field:value,field2:value2. "
                     "Supports operators: : (equal), ! (not equal), > (greater), < (less), ~ (like). "
-                    "Example: name:*shampoo*,orderBy>internalCode"
+                    "Example: name:*shampoo*,order_by>internal_code"
                 ),
             ),
             page: int = Query(1, ge=1, description="Page number (1-indexed)"),

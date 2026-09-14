@@ -13,6 +13,5 @@ class ExcelDTO(FileDTO):
     name: Optional[str] = Field(None, description="File name without extension")
     content_type: Optional[str] = Field(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        alias="contentType",
         description="Excel MIME type",
     )
