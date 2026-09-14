@@ -21,7 +21,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/apigateway/tsuru-${Environment}-cd-backend-api"
-      RetentionInDays: 30
+      RetentionInDays: 14
 
   ApiGatewayAccount:
     Type: AWS::ApiGateway::Account
@@ -65,6 +65,175 @@ Resources:
                 providerARNs:
                   - Fn::ImportValue: "tsuru-cognito-UserPoolArn"
         paths:
+          "/api/organizations/{organization_id}/appointments":
+            get:
+              operationId: backend_list_appointments_api_organizations__organization_id__appointments_get
+              summary: Appointments in a date range
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: from
+                  in: query
+                  required: true
+                  schema:
+                    type: string
+                - name: to
+                  in: query
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            post:
+              operationId: backend_create_appointment_api_organizations__organization_id__appointments_post
+              summary: Book an appointment
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/appointments/{appointment_id}":
+            patch:
+              operationId: backend_update_appointment_api_organizations__organization_id__appointments__appointment_id__patch
+              summary: Reschedule, reassign, or complete an appointment
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: appointment_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/assignments":
             get:
               operationId: backend_list_assignments_api_organizations__organization_id__assignments_get
@@ -184,7 +353,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/assignments/{assignment_id}":
@@ -251,7 +420,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/assignments/{assignment_id}/status":
@@ -318,7 +487,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/branch-types":
@@ -410,7 +579,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/branch-types/{branch_type_id}":
@@ -512,7 +681,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PUT,DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/branches":
@@ -624,7 +793,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/branches/{branch_code}":
@@ -761,7 +930,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PATCH,DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/branches/{branch_code}/status":
@@ -828,8 +997,115 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/branches/{branch_code}/tables":
+            get:
+              operationId: backend_list_tables_api_organizations__organization_id__branches__branch_code__tables_get
+              summary: Mesas and open tabs for a branch
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: branch_code
+                  in: path
+                  required: true
+                  schema:
+                    type: integer
+                - name: include_dynamic
+                  in: query
+                  required: false
+                  schema:
+                    type: boolean
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            post:
+              operationId: backend_create_table_api_organizations__organization_id__branches__branch_code__tables_post
+              summary: Add a mesa, or open a bar tab
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: branch_code
+                  in: path
+                  required: true
+                  schema:
+                    type: integer
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/branches/{branch_code}/terminals":
             get:
@@ -945,7 +1221,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/branches/{branch_code}/terminals/{terminal_code}":
@@ -1097,7 +1373,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PATCH,DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/branches/{branch_code}/terminals/{terminal_code}/status":
@@ -1169,7 +1445,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/categories":
@@ -1271,7 +1547,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/categories/{category_id}":
@@ -1449,7 +1725,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PUT,PATCH,DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/clients":
@@ -1556,7 +1832,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/clients/{client_id}":
@@ -1699,8 +1975,110 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PUT,PATCH,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/clients/{client_id}/assets":
+            get:
+              operationId: backend_list_assets_api_organizations__organization_id__clients__client_id__assets_get
+              summary: "A client's assets (vehicle / equipment)"
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: client_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            post:
+              operationId: backend_create_asset_api_organizations__organization_id__clients__client_id__assets_post
+              summary: Register an asset for a client
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: client_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/clients/{client_id}/departments":
             get:
@@ -1816,7 +2194,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/clients/{client_id}/departments/{department_id}":
@@ -2014,7 +2392,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PUT,PATCH,DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/clients/{client_id}/stores":
@@ -2131,7 +2509,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/clients/{client_id}/stores/upload":
@@ -2198,7 +2576,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/clients/{client_id}/stores/{store_id}":
@@ -2356,7 +2734,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PUT,PATCH,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/closings":
@@ -2478,7 +2856,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/closings/{closing_id}":
@@ -2615,7 +2993,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PATCH,DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/closings/{closing_id}/status":
@@ -2682,7 +3060,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/codes/{hacienda_code}/products/{code}":
@@ -2748,7 +3126,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/confirmations":
@@ -2850,7 +3228,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/confirmations/{confirmation_number}":
@@ -2952,7 +3330,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PUT,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/confirmations/{confirmation_number}/orders/{document_number}":
@@ -3018,7 +3396,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/confirmations/{confirmation_number}/status":
@@ -3085,7 +3463,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/consecutives":
@@ -3192,7 +3570,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/consecutives/{consecutive_id}":
@@ -3253,7 +3631,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/consecutives/{consecutive_id}/status":
@@ -3320,7 +3698,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/dashboard":
@@ -3381,34 +3759,19 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
-          "/api/organizations/{organization_id}/orders":
+          "/api/organizations/{organization_id}/kitchen-stations":
             get:
-              operationId: backend_get_orders_api_organizations__organization_id__orders_get
-              summary: Get all orders for an organization
+              operationId: backend_list_stations_api_organizations__organization_id__kitchen_stations_get
+              summary: Kitchen/bar stations a comanda can print to
               parameters:
                 - name: organization_id
                   in: path
                   required: true
                   schema:
                     type: string
-                - name: search
-                  in: query
-                  required: false
-                  schema:
-                    type: string
-                - name: page
-                  in: query
-                  required: false
-                  schema:
-                    type: integer
-                - name: page_size
-                  in: query
-                  required: false
-                  schema:
-                    type: integer
               responses:
                 '200':
                   description: OK
@@ -3431,8 +3794,8 @@ Resources:
                 requestParameters:
                   integration.request.header.x-user-id: context.authorizer.claims.sub
             post:
-              operationId: backend_create_storefront_order_api_organizations__organization_id__orders_post
-              summary: Create a storefront pedido (anonymous tracked order)
+              operationId: backend_create_station_api_organizations__organization_id__kitchen_stations_post
+              summary: Create a kitchen station
               parameters:
                 - name: organization_id
                   in: path
@@ -3488,7 +3851,308 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/modifier-groups":
+            get:
+              operationId: backend_list_groups_api_organizations__organization_id__modifier_groups_get
+              summary: "The organization's modifier groups"
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            post:
+              operationId: backend_create_group_api_organizations__organization_id__modifier_groups_post
+              summary: Create a modifier group with its options
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/modifier-groups/{group_id}":
+            patch:
+              operationId: backend_update_group_api_organizations__organization_id__modifier_groups__group_id__patch
+              summary: "Update a group; sending `modifiers` replaces the whole list"
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: group_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            delete:
+              operationId: backend_delete_group_api_organizations__organization_id__modifier_groups__group_id__delete
+              summary: Soft-delete a modifier group
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: group_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'PATCH,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/orders":
+            get:
+              operationId: backend_get_orders_api_organizations__organization_id__orders_get
+              summary: Get all orders for an organization
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: search
+                  in: query
+                  required: false
+                  schema:
+                    type: string
+                - name: page
+                  in: query
+                  required: false
+                  schema:
+                    type: integer
+                - name: page_size
+                  in: query
+                  required: false
+                  schema:
+                    type: integer
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            post:
+              operationId: backend_create_order_api_organizations__organization_id__orders_post
+              summary: Create a pedido — storefront (anonymous) or manual (POS)
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/orders/parse":
@@ -3550,7 +4214,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/orders/{document_number}":
@@ -3652,7 +4316,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PATCH,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/parse":
@@ -3719,7 +4383,325 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points":
+            post:
+              operationId: backend_create_sale_point_api_organizations__organization_id__orders__document_number__crossdocking_sale_points_post
+              summary: Capture a cross-docking sale point by hand
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: document_number
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points/{sale_point_id}":
+            patch:
+              operationId: backend_update_sale_point_api_organizations__organization_id__orders__document_number__crossdocking_sale_points__sale_point_id__patch
+              summary: Rename a sale point
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: document_number
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: sale_point_id
+                  in: path
+                  required: true
+                  schema:
+                    type: integer
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            delete:
+              operationId: backend_delete_sale_point_api_organizations__organization_id__orders__document_number__crossdocking_sale_points__sale_point_id__delete
+              summary: Remove a sale point and its items
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: document_number
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: sale_point_id
+                  in: path
+                  required: true
+                  schema:
+                    type: integer
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'PATCH,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points/{sale_point_id}/items":
+            put:
+              operationId: backend_set_sale_point_items_api_organizations__organization_id__orders__document_number__crossdocking_sale_points__sale_point_id__items_put
+              summary: "Replace a sale point's item allocation"
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: document_number
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: sale_point_id
+                  in: path
+                  required: true
+                  schema:
+                    type: integer
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'PUT,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/orders/{document_number}/invoice":
+            post:
+              operationId: backend_link_order_invoice_api_organizations__organization_id__orders__document_number__invoice_post
+              summary: Record that a delivered order was billed
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: document_number
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/orders/{document_number}/reprocess":
@@ -3786,7 +4768,74 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/orders/{document_number}/ticket":
+            post:
+              operationId: backend_generate_order_ticket_api_organizations__organization_id__orders__document_number__ticket_post
+              summary: "Generate the order's 80mm thermal ticket"
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: document_number
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/products":
@@ -3893,8 +4942,69 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/products/by-code/{code}":
+            get:
+              operationId: backend_get_product_by_code_api_organizations__organization_id__products_by_code__code__get
+              summary: Find a product by any of its codes (scanner lookup)
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: code
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/products/parse":
             post:
@@ -3955,7 +5065,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/products/price-bounds":
@@ -4011,7 +5121,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/products/{product_id}":
@@ -4113,8 +5223,340 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PUT,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/products/{product_id}/combo":
+            get:
+              operationId: backend_get_combo_api_organizations__organization_id__products__product_id__combo_get
+              summary: "A combo's components and their catalog prices"
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: product_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            put:
+              operationId: backend_upsert_combo_api_organizations__organization_id__products__product_id__combo_put
+              summary: "Replace a combo's components"
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: product_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,PUT,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/products/{product_id}/lots":
+            get:
+              operationId: backend_list_lots_api_organizations__organization_id__products__product_id__lots_get
+              summary: Sellable lots for a product, in FEFO order
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: product_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/products/{product_id}/modifier-groups":
+            get:
+              operationId: backend_product_groups_api_organizations__organization_id__products__product_id__modifier_groups_get
+              summary: Groups this product asks about, in order
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: product_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            put:
+              operationId: backend_set_product_groups_api_organizations__organization_id__products__product_id__modifier_groups_put
+              summary: Set which groups a product asks about
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: product_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,PUT,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/products/{product_id}/stations":
+            put:
+              operationId: backend_set_stations_api_organizations__organization_id__products__product_id__stations_put
+              summary: "Route a product's comanda to stations (empty = does not print)"
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: product_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'PUT,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/products/{product_id}/status":
             patch:
@@ -4180,7 +5622,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/sales":
@@ -4282,7 +5724,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/sales/{sale_id}":
@@ -4343,7 +5785,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/sessions":
@@ -4465,7 +5907,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/sessions/{session_id}":
@@ -4602,7 +6044,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,PATCH,DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/sessions/{session_id}/status":
@@ -4669,8 +6111,110 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'PATCH,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/tables/{table_id}":
+            patch:
+              operationId: backend_update_table_api_organizations__organization_id__tables__table_id__patch
+              summary: Update a table, or hold/release its order
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: table_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            delete:
+              operationId: backend_delete_table_api_organizations__organization_id__tables__table_id__delete
+              summary: Remove a mesa, or close a tab
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: table_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'PATCH,DELETE,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/terminals/{terminal_id}/consecutives/by-code/{document_type_code}":
             get:
@@ -4735,7 +6279,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/organizations/{organization_id}/terminals/{terminal_id}/consecutives/{document_type_id}":
@@ -4806,7 +6350,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
           "/api/users/{user_id}/organizations/{organization_id}/assignments":
@@ -4882,7 +6426,7 @@ Resources:
                   default:
                     statusCode: '200'
                     responseParameters:
-                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
                       method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
                       method.response.header.Access-Control-Allow-Origin: "'*'"
 
@@ -4890,7 +6434,7 @@ Resources:
     Type: AWS::ApiGateway::GatewayResponse
     Properties:
       ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
       ResponseType: DEFAULT_4XX
@@ -4900,7 +6444,7 @@ Resources:
     Type: AWS::ApiGateway::GatewayResponse
     Properties:
       ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
       ResponseType: DEFAULT_5XX
@@ -4910,7 +6454,7 @@ Resources:
     Type: AWS::ApiGateway::GatewayResponse
     Properties:
       ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
       ResponseType: UNAUTHORIZED
@@ -4920,7 +6464,7 @@ Resources:
     Type: AWS::ApiGateway::GatewayResponse
     Properties:
       ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
         gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
       ResponseType: ACCESS_DENIED

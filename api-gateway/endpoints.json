@@ -7,6 +7,85 @@
       "name": "backend",
       "endpoints": [
         {
+          "path": "/api/organizations/{organization_id}/appointments",
+          "method": "GET",
+          "operation_id": "list_appointments_api_organizations__organization_id__appointments_get",
+          "summary": "Appointments in a date range",
+          "description": "One calendar, two verticals: a salón books a person, a taller books a\nperson **and** a vehicle (`asset_id`). Completing one opens a POS tab — a\nwork-order tab when the asset is set.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [
+            {
+              "name": "from",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "to",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/appointments",
+          "method": "POST",
+          "operation_id": "create_appointment_api_organizations__organization_id__appointments_post",
+          "summary": "Book an appointment",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/appointments/{appointment_id}",
+          "method": "PATCH",
+          "operation_id": "update_appointment_api_organizations__organization_id__appointments__appointment_id__patch",
+          "summary": "Reschedule, reassign, or complete an appointment",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "appointment_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
           "path": "/api/organizations/{organization_id}/assignments",
           "method": "GET",
           "operation_id": "list_assignments_api_organizations__organization_id__assignments_get",
@@ -388,6 +467,65 @@
               "type": "integer",
               "required": true,
               "description": "Branch integer code"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/branches/{branch_code}/tables",
+          "method": "GET",
+          "operation_id": "list_tables_api_organizations__organization_id__branches__branch_code__tables_get",
+          "summary": "Mesas and open tabs for a branch",
+          "description": "Floor plan first, then open tabs — the order a cashier scans the room in.\n\nSet `include_dynamic=false` to get only the fixed floor plan (e.g. when editing\nthe layout rather than serving).",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "branch_code",
+              "type": "integer",
+              "required": true,
+              "description": "Integer branch code, unique per org"
+            }
+          ],
+          "query_params": [
+            {
+              "name": "include_dynamic",
+              "type": "boolean",
+              "required": false,
+              "description": "Include open bar tabs"
+            }
+          ],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/branches/{branch_code}/tables",
+          "method": "POST",
+          "operation_id": "create_table_api_organizations__organization_id__branches__branch_code__tables_post",
+          "summary": "Add a mesa, or open a bar tab",
+          "description": "Creates a table. `is_dynamic: true` opens a **bar tab** instead of adding\nto the floor plan: the row is created on the fly, named after the customer, and\nremoved when the tab is paid.\n\nPersisted server-side on purpose — a shift change or a device swap must not lose\nan open tab. Codes are unique per branch.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "branch_code",
+              "type": "integer",
+              "required": true,
+              "description": "Integer branch code, unique per org"
             }
           ],
           "query_params": [],
@@ -881,6 +1019,58 @@
               "type": "string",
               "required": true,
               "description": "Client UUID"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/clients/{client_id}/assets",
+          "method": "GET",
+          "operation_id": "list_assets_api_organizations__organization_id__clients__client_id__assets_get",
+          "summary": "A client's assets (vehicle / equipment)",
+          "description": "Scoped to the client, exactly like departments and stores — which is\nwhat makes per-asset history possible: \"what did we do to this car last time\"\nonly exists if the asset outlives the visit.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "client_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/clients/{client_id}/assets",
+          "method": "POST",
+          "operation_id": "create_asset_api_organizations__organization_id__clients__client_id__assets_post",
+          "summary": "Register an asset for a client",
+          "description": "`identifier` (placa/serie) is unique per client — the same plate twice is a data-entry mistake, and the history view depends on it being one row.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "client_id",
+              "type": "string",
+              "required": true,
+              "description": ""
             }
           ],
           "query_params": [],
@@ -1796,6 +1986,138 @@
           }
         },
         {
+          "path": "/api/organizations/{organization_id}/kitchen-stations",
+          "method": "GET",
+          "operation_id": "list_stations_api_organizations__organization_id__kitchen_stations_get",
+          "summary": "Kitchen/bar stations a comanda can print to",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/kitchen-stations",
+          "method": "POST",
+          "operation_id": "create_station_api_organizations__organization_id__kitchen_stations_post",
+          "summary": "Create a kitchen station",
+          "description": "`printer_target` is a print destination NAME, not a driver — a browser\ncannot address a thermal printer directly, so it maps to a destination the user\npicks in the OS print dialog.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/modifier-groups",
+          "method": "GET",
+          "operation_id": "list_groups_api_organizations__organization_id__modifier_groups_get",
+          "summary": "The organization's modifier groups",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/modifier-groups",
+          "method": "POST",
+          "operation_id": "create_group_api_organizations__organization_id__modifier_groups_post",
+          "summary": "Create a modifier group with its options",
+          "description": "A modifier with only a `price_delta` rides the parent line. One that\nnames a `product_id` becomes its **own** cart line, so its CABYS and IVA rate\nare its own rather than inherited.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/modifier-groups/{group_id}",
+          "method": "PATCH",
+          "operation_id": "update_group_api_organizations__organization_id__modifier_groups__group_id__patch",
+          "summary": "Update a group; sending `modifiers` replaces the whole list",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "group_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/modifier-groups/{group_id}",
+          "method": "DELETE",
+          "operation_id": "delete_group_api_organizations__organization_id__modifier_groups__group_id__delete",
+          "summary": "Soft-delete a modifier group",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "group_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
           "path": "/api/organizations/{organization_id}/orders",
           "method": "GET",
           "operation_id": "get_orders_api_organizations__organization_id__orders_get",
@@ -1837,9 +2159,9 @@
         {
           "path": "/api/organizations/{organization_id}/orders",
           "method": "POST",
-          "operation_id": "create_storefront_order_api_organizations__organization_id__orders_post",
-          "summary": "Create a storefront pedido (anonymous tracked order)",
-          "description": "Create a tracked order/pedido from a public storefront.\n\nThis endpoint is **anonymous** — it lives under `/api/organizations/` (no\n`x-user-id` required), so guest visitors of a deployed storefront can place an\norder without logging in.\n\n**Body**\n- `customer_name`, `customer_phone`: the guest customer\n- `delivery_method`: e.g. `delivery` / `pickup`\n- `address`: structured Costa Rica address — `state_id` (provincia),\n  `county_id` (cantón), `district_id` (distrito), `neighborhood_id` (barrio)\n  and `address` (dirección exacta)\n- `items`: `[{ product_id, quantity }]` referencing existing products\n\nThe order is created with `order_status = \"pending\"`; totals are computed from\neach product's net price. Returns the order id plus a public **tracking\nnumber** to hand off to WhatsApp.",
+          "operation_id": "create_order_api_organizations__organization_id__orders_post",
+          "summary": "Create a pedido — storefront (anonymous) or manual (POS)",
+          "description": "Create a pedido. Two shapes share this route, told apart by `source`.\n\n**`source: \"manual\"` — a POS pedido manual** (see `docs/MANUAL_ORDERS.md`).\nCaptured by hand in the document editor by an organization that does not (or\ncannot yet) issue electronic documents. Carries lines with CABYS, taxes and\ndiscounts, a client, a delivery target and optional payments.\n\n- `document_number` is **user-writable**; omit it and the server assigns the\n  next `PM-000123`. A collision returns **409**.\n- `is_quote: true` opens the order in `quote` status — a proforma is an order in\n  an early status, never a separate document type.\n- `totals` in the body are a **hint**: the server recomputes every amount.\n- Send `Idempotency-Key` (the POS outbox id) and **reuse it on every retry** —\n  a pedido captured offline is replayed, and without the header it would become\n  two orders.\n- Delivery must resolve to either a registered `store_id` or a real address;\n  there is deliberately no free-text-only mode.\n\n**No `source` — an anonymous storefront pedido.** This route is unauthenticated\n(no `x-user-id`), so guest visitors of a deployed storefront can order. Returns\nthe order id plus a public **tracking number** to hand off to WhatsApp.",
           "path_params": [
             {
               "name": "organization_id",
@@ -1953,11 +2275,185 @@
           }
         },
         {
+          "path": "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points",
+          "method": "POST",
+          "operation_id": "create_sale_point_api_organizations__organization_id__orders__document_number__crossdocking_sale_points_post",
+          "summary": "Capture a cross-docking sale point by hand",
+          "description": "Add a distribution point to an order **without** an Excel file.\n\nUntil now sale points could only be created by uploading a spreadsheet, so a\nsupplier who had the figures — from an email, a portal, a phone call — but not\nthe file could not record them. This is the same data by another route; the\nExcel importer is untouched and the two coexist, so a partial upload can be\nfinished by hand.\n\n- A point either names a registered `store_id` (bringing its GLN and chain) or\n  carries a free `full_name`.\n- **Totals are derived**, never sent: boxes and units are computed from the\n  items and the product's `units_per_box`, the same way the parser does it, so a\n  hand-captured order reconciles against an imported one.\n- Allocating more of a product than the order line ordered returns **422**\n  naming the line — the check the spreadsheet path gets from its template.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "document_number",
+              "type": "string",
+              "required": true,
+              "description": "Order document number"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points/{sale_point_id}",
+          "method": "PATCH",
+          "operation_id": "update_sale_point_api_organizations__organization_id__orders__document_number__crossdocking_sale_points__sale_point_id__patch",
+          "summary": "Rename a sale point",
+          "description": "Works on any sale point, including one that came from an Excel upload — which is the natural fix for a typo in a supplier's file.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "document_number",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "sale_point_id",
+              "type": "integer",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points/{sale_point_id}",
+          "method": "DELETE",
+          "operation_id": "delete_sale_point_api_organizations__organization_id__orders__document_number__crossdocking_sale_points__sale_point_id__delete",
+          "summary": "Remove a sale point and its items",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "document_number",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "sale_point_id",
+              "type": "integer",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points/{sale_point_id}/items",
+          "method": "PUT",
+          "operation_id": "set_sale_point_items_api_organizations__organization_id__orders__document_number__crossdocking_sale_points__sale_point_id__items_put",
+          "summary": "Replace a sale point's item allocation",
+          "description": "Totals are re-derived from the items; send boxes only, units follow from the product's `units_per_box`.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "document_number",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "sale_point_id",
+              "type": "integer",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/orders/{document_number}/invoice",
+          "method": "POST",
+          "operation_id": "link_order_invoice_api_organizations__organization_id__orders__document_number__invoice_post",
+          "summary": "Record that a delivered order was billed",
+          "description": "Link an order to the electronic document that billed it.\n\nWithout this link the frontend cannot tell that a pedido is already invoiced,\nso nothing prevents a second factura for the same order. Returns **409** if the\norder is already linked to a different sale.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "document_number",
+              "type": "string",
+              "required": true,
+              "description": "Order document number"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
           "path": "/api/organizations/{organization_id}/orders/{document_number}/reprocess",
           "method": "POST",
           "operation_id": "reprocess_order_api_organizations__organization_id__orders__document_number__reprocess_post",
           "summary": "Reprocess order: re-parse Excel files and regenerate all outputs",
           "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "document_number",
+              "type": "string",
+              "required": true,
+              "description": "Order document number"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/orders/{document_number}/ticket",
+          "method": "POST",
+          "operation_id": "generate_order_ticket_api_organizations__organization_id__orders__document_number__ticket_post",
+          "summary": "Generate the order's 80mm thermal ticket",
+          "description": "Render the order as a receipt-roll PDF and return the order with\n`attachments.ticket_url` set.\n\nGenerated **server-side**, like the order's other documents — not printed from\nthe browser — so the slip is identical however it is opened, and a reprint or an\nemailed copy matches the original exactly.\n\nRegenerating is intentional: a ticket reprinted after the order was invoiced\npicks up the consecutive number, document key and QR it did not have before.\n\nThe heading names what the slip actually is: `PROFORMA` for a quote (with \"no\nes un comprobante fiscal\" under it), `ORDEN DE TRABAJO` for a taller OT,\n`PEDIDO` for a manual order.",
           "path_params": [
             {
               "name": "organization_id",
@@ -2029,6 +2525,32 @@
               "type": "string",
               "required": true,
               "description": "Organization identifier"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/products/by-code/{code}",
+          "method": "GET",
+          "operation_id": "get_product_by_code_api_organizations__organization_id__products_by_code__code__get",
+          "summary": "Find a product by any of its codes (scanner lookup)",
+          "description": "Resolve a scanned code to a product.\n\nMatches the code NUMBER against every entry in the product's `codes` array,\nwhatever type it is filed under — a scanner hands over digits without saying\nwhether they are the EAN, the internal code or the client's article code.\n\n**Not gated by business type.** Scanning is how a POS is used; a ferretería, a\nfarmacia and a salón all do it. It rides the `commercial/read/products`\npermission every organization already holds.\n\nReturns **404** when nothing matches, so the caller can fall back to a normal\nfiltered search.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "code",
+              "type": "string",
+              "required": true,
+              "description": "Scanned code (any code type)"
             }
           ],
           "query_params": [],
@@ -2121,6 +2643,162 @@
               "type": "string",
               "required": true,
               "description": "Product ID"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/products/{product_id}/combo",
+          "method": "GET",
+          "operation_id": "get_combo_api_organizations__organization_id__products__product_id__combo_get",
+          "summary": "A combo's components and their catalog prices",
+          "description": "Returns the combo's own price plus each component with its catalog\nunit price, which is what the POS needs to distribute the combo discount when\nit explodes the line.\n\nThe combo price is **its own**, never the sum of the parts — that is the point\nof a combo.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "product_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/products/{product_id}/combo",
+          "method": "PUT",
+          "operation_id": "upsert_combo_api_organizations__organization_id__products__product_id__combo_put",
+          "summary": "Replace a combo's components",
+          "description": "Sets the component list and marks the product as a combo, so the flag\nand the parts can never disagree.\n\nRejects a combo containing **itself** or **another combo**: nested combos would\nneed recursive explosion and make the discount distribution ambiguous.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "product_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/products/{product_id}/lots",
+          "method": "GET",
+          "operation_id": "list_lots_api_organizations__organization_id__products__product_id__lots_get",
+          "summary": "Sellable lots for a product, in FEFO order",
+          "description": "**First Expiry, First Out** — not FIFO. For anything with a shelf life\nthe date that matters is when it goes bad, not when it arrived.\n\nExpired and depleted lots are excluded, so the first entry is what the till\nshould default to. `expires_in_days` is present only inside the warning window;\n**0 means expires today**, which is a warning rather than the absence of one.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "product_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/products/{product_id}/modifier-groups",
+          "method": "GET",
+          "operation_id": "product_groups_api_organizations__organization_id__products__product_id__modifier_groups_get",
+          "summary": "Groups this product asks about, in order",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "product_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/products/{product_id}/modifier-groups",
+          "method": "PUT",
+          "operation_id": "set_product_groups_api_organizations__organization_id__products__product_id__modifier_groups_put",
+          "summary": "Set which groups a product asks about",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "product_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/products/{product_id}/stations",
+          "method": "PUT",
+          "operation_id": "set_stations_api_organizations__organization_id__products__product_id__stations_put",
+          "summary": "Route a product's comanda to stations (empty = does not print)",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "product_id",
+              "type": "string",
+              "required": true,
+              "description": ""
             }
           ],
           "query_params": [],
@@ -2407,6 +3085,58 @@
               "type": "string",
               "required": true,
               "description": "Session ID"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/tables/{table_id}",
+          "method": "PATCH",
+          "operation_id": "update_table_api_organizations__organization_id__tables__table_id__patch",
+          "summary": "Update a table, or hold/release its order",
+          "description": "Send `held_document_id` to bind the active document tab to this table,\nor `null` to release it. Everything else is presentation.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "table_id",
+              "type": "string",
+              "required": true,
+              "description": "Table identifier"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/tables/{table_id}",
+          "method": "DELETE",
+          "operation_id": "delete_table_api_organizations__organization_id__tables__table_id__delete",
+          "summary": "Remove a mesa, or close a tab",
+          "description": "Soft delete — an order still points at the table it was taken at, and\nbreaking that link would break the receipt.\n\nReturns **409** while the table still holds an open order: settle or move it\nfirst, rather than silently orphaning the cart.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "table_id",
+              "type": "string",
+              "required": true,
+              "description": "Table identifier"
             }
           ],
           "query_params": [],

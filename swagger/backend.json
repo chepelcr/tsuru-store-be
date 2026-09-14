@@ -742,6 +742,1339 @@
         }
       }
     },
+    "/api/organizations/{organization_id}/branches/{branch_code}/tables": {
+      "get": {
+        "tags": [
+          "tables"
+        ],
+        "summary": "Mesas and open tabs for a branch",
+        "description": "Floor plan first, then open tabs — the order a cashier scans the room in.\n\nSet `include_dynamic=false` to get only the fixed floor plan (e.g. when editing\nthe layout rather than serving).",
+        "operationId": "list_tables_api_organizations__organization_id__branches__branch_code__tables_get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "branch_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Integer branch code, unique per org",
+              "title": "Branch Code"
+            },
+            "description": "Integer branch code, unique per org"
+          },
+          {
+            "name": "include_dynamic",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Include open bar tabs",
+              "default": true,
+              "title": "Include Dynamic"
+            },
+            "description": "Include open bar tabs"
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "User identifier from header",
+              "title": "X-User-Id"
+            },
+            "description": "User identifier from header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "tables"
+        ],
+        "summary": "Add a mesa, or open a bar tab",
+        "description": "Creates a table. `is_dynamic: true` opens a **bar tab** instead of adding\nto the floor plan: the row is created on the fly, named after the customer, and\nremoved when the tab is paid.\n\nPersisted server-side on purpose — a shift change or a device swap must not lose\nan open tab. Codes are unique per branch.",
+        "operationId": "create_table_api_organizations__organization_id__branches__branch_code__tables_post",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "branch_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Integer branch code, unique per org",
+              "title": "Branch Code"
+            },
+            "description": "Integer branch code, unique per org"
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "User identifier from header",
+              "title": "X-User-Id"
+            },
+            "description": "User identifier from header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableCreateRequestDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/tables/{table_id}": {
+      "patch": {
+        "tags": [
+          "tables"
+        ],
+        "summary": "Update a table, or hold/release its order",
+        "description": "Send `held_document_id` to bind the active document tab to this table,\nor `null` to release it. Everything else is presentation.",
+        "operationId": "update_table_api_organizations__organization_id__tables__table_id__patch",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Table identifier",
+              "title": "Table Id"
+            },
+            "description": "Table identifier"
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "User identifier from header",
+              "title": "X-User-Id"
+            },
+            "description": "User identifier from header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableUpdateRequestDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "tables"
+        ],
+        "summary": "Remove a mesa, or close a tab",
+        "description": "Soft delete — an order still points at the table it was taken at, and\nbreaking that link would break the receipt.\n\nReturns **409** while the table still holds an open order: settle or move it\nfirst, rather than silently orphaning the cart.",
+        "operationId": "delete_table_api_organizations__organization_id__tables__table_id__delete",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "table_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Table identifier",
+              "title": "Table Id"
+            },
+            "description": "Table identifier"
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "User identifier from header",
+              "title": "X-User-Id"
+            },
+            "description": "User identifier from header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/products/{product_id}/combo": {
+      "get": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "A combo's components and their catalog prices",
+        "description": "Returns the combo's own price plus each component with its catalog\nunit price, which is what the POS needs to distribute the combo discount when\nit explodes the line.\n\nThe combo price is **its own**, never the sum of the parts — that is the point\nof a combo.",
+        "operationId": "get_combo_api_organizations__organization_id__products__product_id__combo_get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComboResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "Replace a combo's components",
+        "description": "Sets the component list and marks the product as a combo, so the flag\nand the parts can never disagree.\n\nRejects a combo containing **itself** or **another combo**: nested combos would\nneed recursive explosion and make the discount distribution ambiguous.",
+        "operationId": "upsert_combo_api_organizations__organization_id__products__product_id__combo_put",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComboUpsertDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComboResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/modifier-groups": {
+      "get": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "The organization's modifier groups",
+        "operationId": "list_groups_api_organizations__organization_id__modifier_groups_get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModifierGroupListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "Create a modifier group with its options",
+        "description": "A modifier with only a `price_delta` rides the parent line. One that\nnames a `product_id` becomes its **own** cart line, so its CABYS and IVA rate\nare its own rather than inherited.",
+        "operationId": "create_group_api_organizations__organization_id__modifier_groups_post",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModifierGroupCreateDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModifierGroupResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/modifier-groups/{group_id}": {
+      "patch": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "Update a group; sending `modifiers` replaces the whole list",
+        "operationId": "update_group_api_organizations__organization_id__modifier_groups__group_id__patch",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModifierGroupUpdateDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModifierGroupResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "Soft-delete a modifier group",
+        "operationId": "delete_group_api_organizations__organization_id__modifier_groups__group_id__delete",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/products/{product_id}/modifier-groups": {
+      "get": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "Groups this product asks about, in order",
+        "operationId": "product_groups_api_organizations__organization_id__products__product_id__modifier_groups_get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModifierGroupListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "Set which groups a product asks about",
+        "operationId": "set_product_groups_api_organizations__organization_id__products__product_id__modifier_groups_put",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductModifierGroupsDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModifierGroupListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/kitchen-stations": {
+      "get": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "Kitchen/bar stations a comanda can print to",
+        "operationId": "list_stations_api_organizations__organization_id__kitchen_stations_get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KitchenStationListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "Create a kitchen station",
+        "description": "`printer_target` is a print destination NAME, not a driver — a browser\ncannot address a thermal printer directly, so it maps to a destination the user\npicks in the OS print dialog.",
+        "operationId": "create_station_api_organizations__organization_id__kitchen_stations_post",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KitchenStationDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KitchenStationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/products/{product_id}/stations": {
+      "put": {
+        "tags": [
+          "restaurant"
+        ],
+        "summary": "Route a product's comanda to stations (empty = does not print)",
+        "operationId": "set_stations_api_organizations__organization_id__products__product_id__stations_put",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductStationsDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/products/{product_id}/lots": {
+      "get": {
+        "tags": [
+          "verticals"
+        ],
+        "summary": "Sellable lots for a product, in FEFO order",
+        "description": "**First Expiry, First Out** — not FIFO. For anything with a shelf life\nthe date that matters is when it goes bad, not when it arrived.\n\nExpired and depleted lots are excluded, so the first entry is what the till\nshould default to. `expires_in_days` is present only inside the warning window;\n**0 means expires today**, which is a warning rather than the absence of one.",
+        "operationId": "list_lots_api_organizations__organization_id__products__product_id__lots_get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/clients/{client_id}/assets": {
+      "get": {
+        "tags": [
+          "verticals"
+        ],
+        "summary": "A client's assets (vehicle / equipment)",
+        "description": "Scoped to the client, exactly like departments and stores — which is\nwhat makes per-asset history possible: \"what did we do to this car last time\"\nonly exists if the asset outlives the visit.",
+        "operationId": "list_assets_api_organizations__organization_id__clients__client_id__assets_get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Client Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "verticals"
+        ],
+        "summary": "Register an asset for a client",
+        "description": "`identifier` (placa/serie) is unique per client — the same plate twice is a data-entry mistake, and the history view depends on it being one row.",
+        "operationId": "create_asset_api_organizations__organization_id__clients__client_id__assets_post",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Client Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetCreateDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/appointments": {
+      "get": {
+        "tags": [
+          "verticals"
+        ],
+        "summary": "Appointments in a date range",
+        "description": "One calendar, two verticals: a salón books a person, a taller books a\nperson **and** a vehicle (`asset_id`). Completing one opens a POS tab — a\nwork-order tab when the asset is set.",
+        "operationId": "list_appointments_api_organizations__organization_id__appointments_get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "To"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "verticals"
+        ],
+        "summary": "Book an appointment",
+        "operationId": "create_appointment_api_organizations__organization_id__appointments_post",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCreateDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/appointments/{appointment_id}": {
+      "patch": {
+        "tags": [
+          "verticals"
+        ],
+        "summary": "Reschedule, reassign, or complete an appointment",
+        "operationId": "update_appointment_api_organizations__organization_id__appointments__appointment_id__patch",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Appointment Id"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-User-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentUpdateDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/organizations/{organization_id}/branches": {
       "get": {
         "tags": [
@@ -3756,9 +5089,9 @@
         "tags": [
           "orders"
         ],
-        "summary": "Create a storefront pedido (anonymous tracked order)",
-        "description": "Create a tracked order/pedido from a public storefront.\n\nThis endpoint is **anonymous** — it lives under `/api/organizations/` (no\n`x-user-id` required), so guest visitors of a deployed storefront can place an\norder without logging in.\n\n**Body**\n- `customer_name`, `customer_phone`: the guest customer\n- `delivery_method`: e.g. `delivery` / `pickup`\n- `address`: structured Costa Rica address — `state_id` (provincia),\n  `county_id` (cantón), `district_id` (distrito), `neighborhood_id` (barrio)\n  and `address` (dirección exacta)\n- `items`: `[{ product_id, quantity }]` referencing existing products\n\nThe order is created with `order_status = \"pending\"`; totals are computed from\neach product's net price. Returns the order id plus a public **tracking\nnumber** to hand off to WhatsApp.",
-        "operationId": "create_storefront_order_api_organizations__organization_id__orders_post",
+        "summary": "Create a pedido — storefront (anonymous) or manual (POS)",
+        "description": "Create a pedido. Two shapes share this route, told apart by `source`.\n\n**`source: \"manual\"` — a POS pedido manual** (see `docs/MANUAL_ORDERS.md`).\nCaptured by hand in the document editor by an organization that does not (or\ncannot yet) issue electronic documents. Carries lines with CABYS, taxes and\ndiscounts, a client, a delivery target and optional payments.\n\n- `document_number` is **user-writable**; omit it and the server assigns the\n  next `PM-000123`. A collision returns **409**.\n- `is_quote: true` opens the order in `quote` status — a proforma is an order in\n  an early status, never a separate document type.\n- `totals` in the body are a **hint**: the server recomputes every amount.\n- Send `Idempotency-Key` (the POS outbox id) and **reuse it on every retry** —\n  a pedido captured offline is replayed, and without the header it would become\n  two orders.\n- Delivery must resolve to either a registered `store_id` or a real address;\n  there is deliberately no free-text-only mode.\n\n**No `source` — an anonymous storefront pedido.** This route is unauthenticated\n(no `x-user-id`), so guest visitors of a deployed storefront can order. Returns\nthe order id plus a public **tracking number** to hand off to WhatsApp.",
+        "operationId": "create_order_api_organizations__organization_id__orders_post",
         "parameters": [
           {
             "name": "organization_id",
@@ -3770,6 +5103,42 @@
               "title": "Organization Id"
             },
             "description": "Organization identifier"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "POS outbox id; reused on every retry to dedupe replays",
+              "title": "Idempotency-Key"
+            },
+            "description": "POS outbox id; reused on every retry to dedupe replays"
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Capturing user",
+              "title": "X-User-Id"
+            },
+            "description": "Capturing user"
           }
         ],
         "requestBody": {
@@ -3777,7 +5146,9 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateStorefrontOrderDTO"
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Body"
               }
             }
           }
@@ -3787,9 +5158,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StorefrontOrderCreatedResponse"
-                }
+                "schema": {}
               }
             }
           },
@@ -3897,6 +5266,128 @@
         }
       }
     },
+    "/api/organizations/{organization_id}/orders/{document_number}/ticket": {
+      "post": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Generate the order's 80mm thermal ticket",
+        "description": "Render the order as a receipt-roll PDF and return the order with\n`attachments.ticket_url` set.\n\nGenerated **server-side**, like the order's other documents — not printed from\nthe browser — so the slip is identical however it is opened, and a reprint or an\nemailed copy matches the original exactly.\n\nRegenerating is intentional: a ticket reprinted after the order was invoiced\npicks up the consecutive number, document key and QR it did not have before.\n\nThe heading names what the slip actually is: `PROFORMA` for a quote (with \"no\nes un comprobante fiscal\" under it), `ORDEN DE TRABAJO` for a taller OT,\n`PEDIDO` for a manual order.",
+        "operationId": "generate_order_ticket_api_organizations__organization_id__orders__document_number__ticket_post",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "document_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order document number",
+              "title": "Document Number"
+            },
+            "description": "Order document number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/orders/{document_number}/invoice": {
+      "post": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Record that a delivered order was billed",
+        "description": "Link an order to the electronic document that billed it.\n\nWithout this link the frontend cannot tell that a pedido is already invoiced,\nso nothing prevents a second factura for the same order. Returns **409** if the\norder is already linked to a different sale.",
+        "operationId": "link_order_invoice_api_organizations__organization_id__orders__document_number__invoice_post",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "document_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order document number",
+              "title": "Document Number"
+            },
+            "description": "Order document number"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkOrderInvoiceDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/organizations/{organization_id}/orders/parse": {
       "post": {
         "tags": [
@@ -3923,6 +5414,272 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ExcelDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points": {
+      "post": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Capture a cross-docking sale point by hand",
+        "description": "Add a distribution point to an order **without** an Excel file.\n\nUntil now sale points could only be created by uploading a spreadsheet, so a\nsupplier who had the figures — from an email, a portal, a phone call — but not\nthe file could not record them. This is the same data by another route; the\nExcel importer is untouched and the two coexist, so a partial upload can be\nfinished by hand.\n\n- A point either names a registered `store_id` (bringing its GLN and chain) or\n  carries a free `full_name`.\n- **Totals are derived**, never sent: boxes and units are computed from the\n  items and the product's `units_per_box`, the same way the parser does it, so a\n  hand-captured order reconciles against an imported one.\n- Allocating more of a product than the order line ordered returns **422**\n  naming the line — the check the spreadsheet path gets from its template.",
+        "operationId": "create_sale_point_api_organizations__organization_id__orders__document_number__crossdocking_sale_points_post",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "document_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Order document number",
+              "title": "Document Number"
+            },
+            "description": "Order document number"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalePointCreateDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points/{sale_point_id}": {
+      "patch": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Rename a sale point",
+        "description": "Works on any sale point, including one that came from an Excel upload — which is the natural fix for a typo in a supplier's file.",
+        "operationId": "update_sale_point_api_organizations__organization_id__orders__document_number__crossdocking_sale_points__sale_point_id__patch",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "document_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Number"
+            }
+          },
+          {
+            "name": "sale_point_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sale Point Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalePointUpdateDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Remove a sale point and its items",
+        "operationId": "delete_sale_point_api_organizations__organization_id__orders__document_number__crossdocking_sale_points__sale_point_id__delete",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "document_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Number"
+            }
+          },
+          {
+            "name": "sale_point_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sale Point Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/orders/{document_number}/crossdocking/sale-points/{sale_point_id}/items": {
+      "put": {
+        "tags": [
+          "orders"
+        ],
+        "summary": "Replace a sale point's item allocation",
+        "description": "Totals are re-derived from the items; send boxes only, units follow from the product's `units_per_box`.",
+        "operationId": "set_sale_point_items_api_organizations__organization_id__orders__document_number__crossdocking_sale_points__sale_point_id__items_put",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Organization Id"
+            }
+          },
+          {
+            "name": "document_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Document Number"
+            }
+          },
+          {
+            "name": "sale_point_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sale Point Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalePointItemsDTO"
               }
             }
           }
@@ -4377,6 +6134,62 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProductPriceBoundsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/products/by-code/{code}": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Find a product by any of its codes (scanner lookup)",
+        "description": "Resolve a scanned code to a product.\n\nMatches the code NUMBER against every entry in the product's `codes` array,\nwhatever type it is filed under — a scanner hands over digits without saying\nwhether they are the EAN, the internal code or the client's article code.\n\n**Not gated by business type.** Scanning is how a POS is used; a ferretería, a\nfarmacia and a salón all do it. It rides the `commercial/read/products`\npermission every organization already holds.\n\nReturns **404** when nothing matches, so the caller can fall back to a normal\nfiltered search.",
+        "operationId": "get_product_by_code_api_organizations__organization_id__products_by_code__code__get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Scanned code (any code type)",
+              "title": "Code"
+            },
+            "description": "Scanned code (any code type)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
                 }
               }
             }
@@ -6358,6 +8171,235 @@
   },
   "components": {
     "schemas": {
+      "AppointmentCreateDTO": {
+        "properties": {
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "staff_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Staff User Id"
+          },
+          "service_product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Product Id"
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Duration Minutes",
+            "default": 30
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "starts_at"
+        ],
+        "title": "AppointmentCreateDTO"
+      },
+      "AppointmentUpdateDTO": {
+        "properties": {
+          "starts_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "staff_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Staff User Id"
+          },
+          "appointment_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appointment Status"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "converted_document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Converted Document Id"
+          }
+        },
+        "type": "object",
+        "title": "AppointmentUpdateDTO"
+      },
+      "AssetCreateDTO": {
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Identifier"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2200.0,
+                "minimum": 1900.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "identifier"
+        ],
+        "title": "AssetCreateDTO"
+      },
       "AssignmentCreateDTO": {
         "properties": {
           "user_id": {
@@ -6746,10 +8788,8 @@
           },
           "type": {
             "type": "string",
-            "enum": [
-              "stand",
-              "restaurant"
-            ],
+            "maxLength": 50,
+            "minLength": 1,
             "title": "Type"
           },
           "location": {
@@ -7151,10 +9191,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": [
-                  "stand",
-                  "restaurant"
-                ]
+                "maxLength": 50,
+                "minLength": 1
               },
               {
                 "type": "null"
@@ -7959,6 +9997,132 @@
         "title": "ClosingUpdateRequestDTO",
         "description": "Request DTO for updating a closing with snake_case fields."
       },
+      "ComboItemDTO": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Product Id"
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "default": 1
+          },
+          "sort_order": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Sort Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id"
+        ],
+        "title": "ComboItemDTO",
+        "description": "One component of a combo."
+      },
+      "ComboItemResponse": {
+        "properties": {
+          "combo_item_id": {
+            "type": "string",
+            "title": "Combo Item Id"
+          },
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Price"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity",
+            "default": 1
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "combo_item_id",
+          "product_id"
+        ],
+        "title": "ComboItemResponse"
+      },
+      "ComboResponse": {
+        "properties": {
+          "combo_product_id": {
+            "type": "string",
+            "title": "Combo Product Id"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ComboItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "combo_product_id"
+        ],
+        "title": "ComboResponse"
+      },
+      "ComboUpsertDTO": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ComboItemDTO"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ComboUpsertDTO",
+        "description": "Replace a combo's component set.\n\nThe combo's PRICE stays on the product row — a combo is priced as itself,\nnot as the sum of its parts. These components exist so the POS can explode\nthe line and keep each part's own CABYS and IVA rate."
+      },
       "ConfirmationListResponse": {
         "properties": {
           "data": {
@@ -8459,74 +10623,6 @@
           "total_amount"
         ],
         "title": "CreateSaleDTO"
-      },
-      "CreateStorefrontOrderDTO": {
-        "properties": {
-          "customer_name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Customer Name"
-          },
-          "customer_phone": {
-            "type": "string",
-            "maxLength": 50,
-            "minLength": 1,
-            "title": "Customer Phone"
-          },
-          "delivery_method": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Delivery Method",
-            "description": "Delivery method (e.g. 'delivery', 'pickup')"
-          },
-          "address": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StorefrontOrderAddressDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Structured CR delivery address"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/StorefrontOrderItemDTO"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Items"
-          },
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 500
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comment"
-          }
-        },
-        "type": "object",
-        "required": [
-          "customer_name",
-          "customer_phone",
-          "items"
-        ],
-        "title": "CreateStorefrontOrderDTO",
-        "description": "Anonymous storefront pedido create payload.\n\nPlaced by a guest visitor from a deployed storefront — no user account,\nno Client row. Builds a tracked Order with order_status='pending'."
       },
       "CrossDockingAttachmentsDTO": {
         "properties": {
@@ -9072,6 +11168,37 @@
         "title": "ExcelDTO",
         "description": "DTO for Excel file uploads."
       },
+      "ExemptionInstitutionDTO": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "title": "ExemptionInstitutionDTO",
+        "description": "Issuing institution of an exoneration (Nota 10.1)."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -9176,6 +11303,180 @@
         ],
         "title": "ImageDTO",
         "description": "DTO for image file uploads."
+      },
+      "KitchenStationDTO": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "branch_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Code"
+          },
+          "printer_target": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printer Target"
+          },
+          "sort_order": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Sort Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "KitchenStationDTO"
+      },
+      "KitchenStationListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/KitchenStationResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "KitchenStationListResponse"
+      },
+      "KitchenStationResponse": {
+        "properties": {
+          "station_id": {
+            "type": "string",
+            "title": "Station Id"
+          },
+          "organization_id": {
+            "type": "string",
+            "title": "Organization Id"
+          },
+          "branch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "printer_target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printer Target"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "station_id",
+          "organization_id",
+          "name"
+        ],
+        "title": "KitchenStationResponse"
+      },
+      "LinkOrderInvoiceDTO": {
+        "properties": {
+          "sale_id": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Sale Id"
+          },
+          "document_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Type"
+          },
+          "consecutive_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consecutive Number"
+          },
+          "document_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Key"
+          },
+          "issued_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued On"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sale_id"
+        ],
+        "title": "LinkOrderInvoiceDTO",
+        "description": "The electronic document that billed an order.\n\nOnly `sale_id` is required: the rest is the Hacienda identity of the\ndocument, which the POS knows once it is issued and which the order badge\nrenders (\"Facturado · {consecutivo}\")."
       },
       "LocationDTO": {
         "properties": {
@@ -9385,6 +11686,284 @@
         "type": "object",
         "title": "LocationResponse"
       },
+      "ModifierDTO": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "price_delta": {
+            "type": "number",
+            "title": "Price Delta",
+            "default": 0
+          },
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
+          "sort_order": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Sort Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ModifierDTO"
+      },
+      "ModifierGroupCreateDTO": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "min_select": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Min Select",
+            "default": 0
+          },
+          "max_select": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Select"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
+          },
+          "sort_order": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Sort Order",
+            "default": 0
+          },
+          "modifiers": {
+            "items": {
+              "$ref": "#/components/schemas/ModifierDTO"
+            },
+            "type": "array",
+            "title": "Modifiers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ModifierGroupCreateDTO"
+      },
+      "ModifierGroupListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ModifierGroupResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ModifierGroupListResponse"
+      },
+      "ModifierGroupResponse": {
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "title": "Group Id"
+          },
+          "organization_id": {
+            "type": "string",
+            "title": "Organization Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "min_select": {
+            "type": "integer",
+            "title": "Min Select",
+            "default": 0
+          },
+          "max_select": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Select"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": false
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          },
+          "modifiers": {
+            "items": {
+              "$ref": "#/components/schemas/ModifierResponse"
+            },
+            "type": "array",
+            "title": "Modifiers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_id",
+          "organization_id",
+          "name"
+        ],
+        "title": "ModifierGroupResponse"
+      },
+      "ModifierGroupUpdateDTO": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "min_select": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Select"
+          },
+          "max_select": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Select"
+          },
+          "required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          },
+          "modifiers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ModifierDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modifiers"
+          }
+        },
+        "type": "object",
+        "title": "ModifierGroupUpdateDTO"
+      },
+      "ModifierResponse": {
+        "properties": {
+          "modifier_id": {
+            "type": "string",
+            "title": "Modifier Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "price_delta": {
+            "type": "number",
+            "title": "Price Delta",
+            "default": 0
+          },
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "modifier_id",
+          "name"
+        ],
+        "title": "ModifierResponse"
+      },
       "OrderAttachmentsDTO": {
         "properties": {
           "pdf_url": {
@@ -9422,6 +12001,18 @@
             ],
             "title": "Nuevo Reporte Url",
             "description": "URL to Nuevo Reporte Excel document"
+          },
+          "ticket_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Url",
+            "description": "80mm thermal ticket PDF (TSR-127). Generated server-side like the other documents, so a re-print is byte-identical to the original."
           }
         },
         "type": "object",
@@ -9600,6 +12191,167 @@
               "ART-001",
               "ARTICLE-456"
             ]
+          },
+          "product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id",
+            "description": "Catalog product this line came from. REQUIRED to rebuild a cart when billing the order later — lines are linked by product_id, never by description.",
+            "examples": [
+              "7f3d…",
+              null
+            ]
+          },
+          "cabys": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabys",
+            "description": "CABYS code captured with the line. Kept even though a pedido is not fiscal: fabricating one later would put the wrong tax rate on a real document.",
+            "examples": [
+              "0161010150000",
+              null
+            ]
+          },
+          "net_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Price",
+            "description": "Unit price before tax",
+            "examples": [
+              3500.0,
+              null
+            ]
+          },
+          "taxes": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxes",
+            "description": "Per-line tax breakdown, canonical `ProductTaxDTO` shape: [{tax_type_id, tax_rate: {id, percentage, code}, tax_factor: {id, factor}, special_fields: {quantity, percentage, proportion, volume_consumption, tax_amount: {id, amount}}, exemption: {type, other_type, number, institution, percentage}, is_amount, amount}]. Rows written before this was unified are normalized on read; the flatter `{code, rate_code, rate}` request spelling is legacy."
+          },
+          "discounts": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discounts",
+            "description": "Per-line discount cascade in Nota 20 order, canonical `ProductDiscountDTO` shape: [{discount_type_id, percentage, reason, is_amount, amount}]. Note `reason` is the Nota 20 free text — the request spelling calls the same field `nature`."
+          },
+          "codes": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codes",
+            "description": "The LINE's own product codes [{code_type_id, number}] — Nota 6: 01 vendedor, 02 comprador, 03 fabricante, 04 uso interno, 99 otros. Distinct from the product's: a chain assigns its own buyer article code, and the product's array only holds the latest import's."
+          },
+          "unit_measure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Measure",
+            "description": "Hacienda UnidadMedida — required on every document line",
+            "examples": [
+              "Unid",
+              "kg",
+              "Sp"
+            ]
+          },
+          "commercial_unit_measure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commercial Unit Measure",
+            "description": "Free-text commercial unit shown to the customer",
+            "examples": [
+              "Caja de 12"
+            ]
+          },
+          "customs_part": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customs Part",
+            "description": "Partida arancelaria, for imported goods"
+          },
+          "base_amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Amount",
+            "description": "Editable taxable base. Legal only for tax code 07 (IVA cálculo especial) or IVACobradoFabrica '01'; rejected elsewhere."
+          },
+          "iva_collected_factory": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iva Collected Factory",
+            "description": "IVACobradoFabrica: '01' settled at factory, '02' exempt by regime",
+            "examples": [
+              "01",
+              "02"
+            ]
           }
         },
         "type": "object",
@@ -9689,6 +12441,30 @@
               1000.0,
               5000.5,
               10000.0
+            ]
+          },
+          "discounts": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Discounts",
+            "description": "Total discount amount across all lines",
+            "default": 0,
+            "examples": [
+              0.0,
+              50.0,
+              100.0
+            ]
+          },
+          "taxes": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Taxes",
+            "description": "Total tax amount across all lines",
+            "default": 0,
+            "examples": [
+              0.0,
+              123.5,
+              1300.0
             ]
           },
           "net_total": {
@@ -9917,6 +12693,18 @@
             ],
             "description": "Client information"
           },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id",
+            "description": "Catalog client id this order belongs to"
+          },
           "supplier": {
             "anyOf": [
               {
@@ -9938,6 +12726,80 @@
               }
             ],
             "description": "Delivery location information"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Where the order came from: 'import' (Excel), 'manual' (POS pedido manual) or 'storefront'. The IVA report excludes manual orders — a pedido is not a fiscal document.",
+            "examples": [
+              "import",
+              "manual",
+              "storefront"
+            ]
+          },
+          "currency_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Code",
+            "description": "Currency the order was captured in",
+            "examples": [
+              "CRC",
+              "USD"
+            ]
+          },
+          "exchange_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange Rate",
+            "description": "Exchange rate at capture time",
+            "examples": [
+              1,
+              512.35
+            ]
+          },
+          "is_quote": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Quote",
+            "description": "True while order_status is 'quote' (a proforma awaiting approval)"
+          },
+          "invoice": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice",
+            "description": "The electronic document that billed this order, once linked. Its presence is what lets the UI hide 'Facturar pedido' and stop a second factura being issued."
           },
           "event": {
             "anyOf": [
@@ -10286,11 +13148,60 @@
             "examples": [
               "https://cdn.example.com/logos/acme.png"
             ]
+          },
+          "identification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartyIdentificationDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Party tax identification"
           }
         },
         "type": "object",
         "title": "PartyDTO",
         "description": "Party information (Client/Supplier).\n\nRepresents a business party with identification and contact details."
+      },
+      "PartyIdentificationDTO": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Hacienda identification type code",
+            "examples": [
+              "01",
+              "02"
+            ]
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number",
+            "description": "Identification number, digits only",
+            "examples": [
+              "3102007223"
+            ]
+          }
+        },
+        "type": "object",
+        "title": "PartyIdentificationDTO",
+        "description": "A party's tax identification (cédula física / jurídica / DIMEX / NITE).\n\nCarried on the order because billing it later needs it twice over: it is\nthe receiver's identification on the electronic document, and it is what\ndecides whether the customer is a retail chain with extra requirements\n(see `fe/pos-system/src/lib/chainClients.ts` — the match is on the number,\nnever on the name)."
       },
       "PhoneRequestDTO": {
         "properties": {
@@ -10566,6 +13477,20 @@
           "pagination"
         ],
         "title": "ProductListResponse"
+      },
+      "ProductModifierGroupsDTO": {
+        "properties": {
+          "group_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Group Ids"
+          }
+        },
+        "type": "object",
+        "title": "ProductModifierGroupsDTO",
+        "description": "Which groups a product asks about, in order."
       },
       "ProductPriceBoundsResponse": {
         "properties": {
@@ -11360,6 +14285,20 @@
         ],
         "title": "ProductResponse"
       },
+      "ProductStationsDTO": {
+        "properties": {
+          "station_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Station Ids"
+          }
+        },
+        "type": "object",
+        "title": "ProductStationsDTO",
+        "description": "Stations a product's comanda prints to. Empty means it does not print."
+      },
       "ProductStatusRequestDTO": {
         "properties": {
           "status": {
@@ -11422,6 +14361,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/TaxSpecialFieldsDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exemption": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaxExemptionDTO"
               },
               {
                 "type": "null"
@@ -11863,6 +14812,96 @@
           "amount"
         ],
         "title": "SalePaymentResponse"
+      },
+      "SalePointCreateDTO": {
+        "properties": {
+          "store_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Store Id"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 250
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SalePointItemDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "title": "SalePointCreateDTO",
+        "description": "Capture a cross-docking sale point by hand.\n\nExists because the distribution can only be created by uploading a\nspreadsheet today. A supplier who has the figures — from an email, a portal\nor a phone call — but no Excel file simply cannot record them.\n\nA point either names a registered `store_id` (bringing its GLN and chain) or\ncarries a free `full_name` for one the client has not registered."
+      },
+      "SalePointItemDTO": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Product Id"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Quantity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "quantity"
+        ],
+        "title": "SalePointItemDTO",
+        "description": "One product's allocation to a sale point."
+      },
+      "SalePointItemsDTO": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SalePointItemDTO"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "title": "SalePointItemsDTO",
+        "description": "Replace a sale point's whole item set."
+      },
+      "SalePointUpdateDTO": {
+        "properties": {
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 250
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          }
+        },
+        "type": "object",
+        "title": "SalePointUpdateDTO"
       },
       "SaleReceiverDTO": {
         "properties": {
@@ -12746,141 +15785,256 @@
         ],
         "title": "StoreResponse"
       },
-      "StorefrontOrderAddressDTO": {
+      "TableCreateRequestDTO": {
         "properties": {
-          "state_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "State Id",
-            "description": "Provincia id"
+          "code": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Code"
           },
-          "county_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "County Id",
-            "description": "Cantón id"
-          },
-          "district_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "District Id",
-            "description": "Distrito id"
-          },
-          "neighborhood_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Neighborhood Id",
-            "description": "Barrio id"
-          },
-          "address": {
+          "name": {
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 500
+                "maxLength": 100
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Address",
-            "description": "Dirección exacta (free text)"
-          }
-        },
-        "type": "object",
-        "title": "StorefrontOrderAddressDTO",
-        "description": "Structured Costa Rica delivery address (data-be location cascade ids)."
-      },
-      "StorefrontOrderCreatedResponse": {
-        "properties": {
-          "order_id": {
-            "type": "integer",
-            "title": "Order Id",
-            "description": "Internal order identifier"
+            "title": "Name"
           },
-          "document_number": {
-            "type": "string",
-            "title": "Document Number",
-            "description": "Generated order document number"
-          },
-          "tracking_number": {
-            "type": "string",
-            "title": "Tracking Number",
-            "description": "Public tracking number"
-          },
-          "order_status": {
-            "type": "string",
-            "title": "Order Status",
-            "description": "Order status",
-            "default": "pending"
-          },
-          "grand_total": {
+          "seats": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "integer",
+                "minimum": 0.0
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Grand Total",
-            "description": "Order grand total"
-          }
-        },
-        "type": "object",
-        "required": [
-          "order_id",
-          "document_number",
-          "tracking_number"
-        ],
-        "title": "StorefrontOrderCreatedResponse",
-        "description": "Returned after a storefront pedido is persisted.\n\nCarries the internal order id, the public document/tracking number the\ncustomer hands off to WhatsApp, and the resulting status."
-      },
-      "StorefrontOrderItemDTO": {
-        "properties": {
-          "product_id": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Product Id"
+            "title": "Seats"
           },
-          "quantity": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Quantity",
-            "description": "Units ordered (must be > 0)"
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          },
+          "is_dynamic": {
+            "type": "boolean",
+            "title": "Is Dynamic",
+            "default": false
           }
         },
         "type": "object",
         "required": [
-          "product_id",
-          "quantity"
+          "code"
         ],
-        "title": "StorefrontOrderItemDTO",
-        "description": "A single line in a storefront pedido — references an existing product."
+        "title": "TableCreateRequestDTO",
+        "description": "Create a mesa (floor plan) or open a bar tab (`is_dynamic=true`)."
+      },
+      "TableListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/TableResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "TableListResponse"
+      },
+      "TableResponse": {
+        "properties": {
+          "table_id": {
+            "type": "string",
+            "title": "Table Id"
+          },
+          "organization_id": {
+            "type": "string",
+            "title": "Organization Id"
+          },
+          "branch_id": {
+            "type": "string",
+            "title": "Branch Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "seats": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seats"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order",
+            "default": 0
+          },
+          "is_dynamic": {
+            "type": "boolean",
+            "title": "Is Dynamic",
+            "description": "True for a bar tab; false for the fixed floor plan",
+            "default": false
+          },
+          "opened_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened By"
+          },
+          "held_document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Document Id",
+            "description": "Document tab currently held against this table"
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "table_id",
+          "organization_id",
+          "branch_id",
+          "code"
+        ],
+        "title": "TableResponse"
+      },
+      "TableUpdateRequestDTO": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "seats": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seats"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          },
+          "held_document_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Document Id"
+          }
+        },
+        "type": "object",
+        "title": "TableUpdateRequestDTO"
       },
       "TaxAmountDTO": {
         "properties": {
@@ -12917,6 +16071,119 @@
           "amount"
         ],
         "title": "TaxAmountResponse"
+      },
+      "TaxExemptionDTO": {
+        "properties": {
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "other_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Type"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "institution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExemptionInstitutionDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "article": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Article"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "issue_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Date"
+          },
+          "percentage": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentage"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          }
+        },
+        "type": "object",
+        "title": "TaxExemptionDTO",
+        "description": "`Exoneracion` on a single tax — mirrors sales-be's `ExemptionDTO`.\n\nPer-TAX rather than per-line, exactly as the document models it: a line can\ncarry an exonerated IVA alongside a fully-payable excise, and the XML hangs\n`Exoneracion` off each `Impuesto`.\n\nThe product's own `exemption_authorization_code` / `exempted_rate` /\n`exemption_amount` columns are the CATALOG default for a product that is\nalways exonerated; they are copied onto the IVA row of an imported line. This\nDTO is what travels once the exemption is on a line, so an operator can grant\none per sale without editing the product."
       },
       "TaxFactorDTO": {
         "properties": {

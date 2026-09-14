@@ -17,6 +17,23 @@ REQUIRE_AUTH = True
 HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 I = [""] + ["  " * n for n in range(1, 12)]   # indentation levels
 
+# Every header a browser may send on a cross-origin request. It is ONE constant
+# because it is emitted twice — on the per-path OPTIONS mock and on the CORS
+# gateway responses — and a header allowed by one but not the other fails the
+# preflight in exactly the cases that matter.
+#
+# `Idempotency-Key` is not optional: the POS sends it on every manual-order POST
+# so a pedido captured offline replays as one order rather than several. Without
+# it the preflight fails, `fetch` rejects with a bare network error, and the POS
+# reads that as "no connection" and queues the pedido forever — it never reaches
+# the server and never surfaces an error. sales-be's gateway has always carried
+# it; this one did not, which is why a manual order could be captured but never
+# created.
+CORS_ALLOW_HEADERS = (
+    "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,"
+    "x-user-id,Idempotency-Key"
+)
+
 CUSTOM_DOMAIN = "orders-api.tsuru.jcampos.dev"
 
 
@@ -356,7 +373,7 @@ for path in sorted(all_paths.keys()):
     L(I[9] + "  statusCode: '200'")
     L(I[9] + "  responseParameters:")
     L(I[9] + "    method.response.header.Access-Control-Allow-Headers:"
-       " \"'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'\"")
+       " \"'" + CORS_ALLOW_HEADERS + "'\"")
     L(I[9] + "    method.response.header.Access-Control-Allow-Methods: \"'" + allowed_methods + "'\"")
     L(I[9] + "    method.response.header.Access-Control-Allow-Origin: \"'*'\"")
 
@@ -370,7 +387,7 @@ for rtype in ("DEFAULT_4XX", "DEFAULT_5XX", "UNAUTHORIZED", "ACCESS_DENIED"):
     L(I[2] + "Properties:")
     L(I[3] + "ResponseParameters:")
     L(I[4] + "gatewayresponse.header.Access-Control-Allow-Headers:"
-       " \"'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id'\"")
+       " \"'" + CORS_ALLOW_HEADERS + "'\"")
     L(I[4] + "gatewayresponse.header.Access-Control-Allow-Methods: \"'GET,POST,PUT,PATCH,DELETE,OPTIONS'\"")
     L(I[4] + "gatewayresponse.header.Access-Control-Allow-Origin: \"'*'\"")
     L(I[3] + "ResponseType: " + rtype)
