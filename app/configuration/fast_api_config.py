@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from app.middleware.user_id_middleware import UserIdMiddleware
 from app.configuration.support_incidents import install_support_incident_reporting
-from app.error_contract import install_error_handlers
+from app.error_contract import ERROR_RESPONSES, install_error_handlers
 from starlette.middleware.cors import CORSMiddleware
 
 from app.controllers.assignments_controller import AssignmentsController
@@ -61,6 +61,7 @@ class FastApiConfig:
             redoc_url=None,
             openapi_url="/openapi.json",
             redirect_slashes=False,
+            responses=ERROR_RESPONSES,
         )
 
         return app

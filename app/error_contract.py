@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from http import HTTPStatus
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, Union, runtime_checkable
 
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
@@ -71,7 +71,7 @@ class ErrorResponseDTO(BaseModel):
     message: str
     service: str
     path: str
-    details: list[dict[str, Any]] | None = None
+    details: Optional[List[Dict[str, Any]]] = None
 
 
 class StoreException(Exception):
@@ -100,11 +100,11 @@ def error_response(
     *,
     status: int,
     code: str | None = None,
-    details: list[dict[str, Any]] | None = None,
+    details: Optional[List[Dict[str, Any]]] = None,
 ) -> JSONResponse:
     reason = HTTPStatus(status).phrase if status in HTTPStatus._value2member_map_ else "Error"
     payload = ErrorResponseDTO(
-        timestamp=datetime.now(UTC).isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
         status=status,
         error=reason,
         message=code or code_for_status(status),
@@ -138,3 +138,13 @@ def install_error_handlers(app: Any) -> None:
     async def unexpected_error(request: Request, exc: Exception):
         logger.exception("Unhandled error on %s", request.url.path, exc_info=exc)
         return error_response(request, status=500)
+
+
+#: OpenAPI declaration of the error envelope, applied to every route via
+#: `FastAPI(responses=...)` so consumers get a typed DTO for failures instead of
+#: FastAPI's bare `{"detail": ...}` default (which no longer matches what the
+#: handlers above actually return).
+ERROR_RESPONSES: Dict[Union[int, str], Dict[str, Any]] = {
+    status: {"model": ErrorResponseDTO, "description": error.message}
+    for status, error in _BY_STATUS.items()
+}
