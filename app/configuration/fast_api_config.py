@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from app.middleware.user_id_middleware import UserIdMiddleware
+from app.configuration.support_incidents import install_support_incident_reporting
+from app.error_contract import install_error_handlers
 from starlette.middleware.cors import CORSMiddleware
 
 from app.controllers.assignments_controller import AssignmentsController
@@ -26,6 +28,8 @@ from app.controllers.terminals_controller import TerminalsController
 class FastApiConfig:
     def __init__(self):
         self.app = self._create_app()
+        install_support_incident_reporting(self.app, 'store-api')
+        install_error_handlers(self.app)
         self._configure_cors()
         self.app.add_middleware(UserIdMiddleware)
         AssignmentsController(self.app)
