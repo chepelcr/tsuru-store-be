@@ -102,12 +102,13 @@ def error_response(
     code: str | None = None,
     details: Optional[List[Dict[str, Any]]] = None,
 ) -> JSONResponse:
+    request.state.observability_error_code = code or code_for_status(status)
     reason = HTTPStatus(status).phrase if status in HTTPStatus._value2member_map_ else "Error"
     payload = ErrorResponseDTO(
         timestamp=datetime.now(timezone.utc).isoformat(),
         status=status,
         error=reason,
-        message=code or code_for_status(status),
+        message=request.state.observability_error_code,
         service="store-api",
         path=request.url.path,
         details=details,
@@ -136,6 +137,7 @@ def install_error_handlers(app: Any) -> None:
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, exc: Exception):
+        request.state.observability_exception = exc
         logger.exception("Unhandled error on %s", request.url.path, exc_info=exc)
         return error_response(request, status=500)
 

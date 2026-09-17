@@ -136,6 +136,21 @@ Resources:
       SourceArn: !GetAtt KeepWarmRule.Arn
 
 
+  ObservabilityPublishPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "tsuru-${Environment}-observability-publish"
+      Roles:
+        - !Ref LambdaRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: sns:Publish
+            Resource:
+              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:tsuru-${Environment}-audit-records-topic"
+              - !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:tsuru-${Environment}-backend-errors-topic"
+
 Outputs:
   CrossDockingBackendFunctionArn:
     Description: "Cross-Docking Backend Lambda Function ARN"
