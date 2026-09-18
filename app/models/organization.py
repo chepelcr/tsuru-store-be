@@ -24,7 +24,11 @@ class Organization(Base):
     subdomain: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     custom_domain: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     billing_email: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    plan: Mapped[str] = mapped_column(String(50), nullable=False, default="free")
+    # `plan` moved to `users` (management-be migration 0021, TSR-284): a paid
+    # owner holds several organizations and a free owner exactly one, which is a
+    # fact about the PERSON. The column is gone from the table, and a model that
+    # still declares it puts it in every SELECT — which is why every store-be
+    # query touching organizations started failing with UndefinedColumn.
     owner_id: Mapped[str] = mapped_column(String(100), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
