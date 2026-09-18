@@ -71,6 +71,22 @@ def _identity(request: Request) -> tuple[str | None, str | None]:
     return user_id, organization_id
 
 
+def _format_exception(error: BaseException) -> str:
+    """The traceback text, on every runtime we deploy to.
+
+    `traceback.format_exception(exc)` — one argument — is Python 3.10+. store-be
+    still runs 3.9, where it raises `TypeError: missing 2 required positional
+    arguments`, *inside the error reporter*, in a `finally` block. An exception
+    raised there REPLACES the exception being handled, so the real application
+    error never reached an exception handler: the caller got a bare 500 with no
+    error DTO, and the incident describing it was never published either.
+
+    The three-argument form is correct on 3.9 through 3.14, so this needs no
+    version check.
+    """
+    return "".join(traceback.format_exception(type(error), error, error.__traceback__))
+
+
 def _publish(kind: str, event_type: str, type_name: str, data: dict[str, Any],
              *, event_id: str, occurred_at: datetime) -> None:
     topic = _topic(kind)
@@ -122,50 +138,60 @@ def install_observability_events(app: FastAPI, service_name: str) -> None:
             caught = exc
             raise
         finally:
-            duration_ms = round((asyncio.get_running_loop().time() - started) * 1000)
-            method = request.method.upper()
-            request_type = f"{method} {route}"[:160]
-            common = {
-                "service": service_name,
-                "requestType": request_type,
-                "httpMethod": method,
-                "route": route[:500],
-                "statusCode": status_code,
-                "userId": user_id,
-                "organizationId": organization_id,
-                "requestId": request_id,
-            }
-            await _publish_async(
-                "audit-records",
-                "AUDIT_REQUEST_COMPLETED",
-                "AuditRequestCompletedEvent",
-                {**common, "durationMs": duration_ms},
-                event_id=str(uuid4()),
-                occurred_at=started_at,
-            )
-            if status_code >= 500 or caught is not None:
-                internal_error = caught or getattr(request.state, "observability_exception", None)
-                code = str(
-                    getattr(request.state, "observability_error_code", None)
-                    or getattr(internal_error, "code", None)
-                    or f"COMMON_{status_code}"
-                )
+            # Reporting is best-effort, always. `_publish` already swallows its
+            # own failures, but everything AROUND it — building the payload,
+            # reading request state, formatting a traceback — runs in a `finally`,
+            # where a raise replaces the exception being handled and turns a
+            # diagnosable application error into a bare 500. That is exactly what
+            # a Python 3.9 `format_exception` call did here. Nothing in this block
+            # is allowed to change the outcome of the request.
+            try:
+                duration_ms = round((asyncio.get_running_loop().time() - started) * 1000)
+                method = request.method.upper()
+                request_type = f"{method} {route}"[:160]
+                common = {
+                    "service": service_name,
+                    "requestType": request_type,
+                    "httpMethod": method,
+                    "route": route[:500],
+                    "statusCode": status_code,
+                    "userId": user_id,
+                    "organizationId": organization_id,
+                    "requestId": request_id,
+                }
                 await _publish_async(
-                    "backend-errors",
-                    "BACKEND_ERROR_OCCURRED",
-                    "BackendErrorOccurredEvent",
-                    {
-                        **common,
-                        "errorCode": code,
-                        "errorName": internal_error.__class__.__name__ if internal_error else "BackendHttpError",
-                        # Public response messages are catalog codes. Internal detail
-                        # stays only in this protected support event.
-                        "errorMessage": (str(internal_error) if internal_error else code)[:2000],
-                        "stackTrace": (
-                            "".join(traceback.format_exception(internal_error))[:8000]
-                            if internal_error is not None else None
-                        ),
-                    },
+                    "audit-records",
+                    "AUDIT_REQUEST_COMPLETED",
+                    "AuditRequestCompletedEvent",
+                    {**common, "durationMs": duration_ms},
                     event_id=str(uuid4()),
                     occurred_at=started_at,
                 )
+                if status_code >= 500 or caught is not None:
+                    internal_error = caught or getattr(request.state, "observability_exception", None)
+                    code = str(
+                        getattr(request.state, "observability_error_code", None)
+                        or getattr(internal_error, "code", None)
+                        or f"COMMON_{status_code}"
+                    )
+                    await _publish_async(
+                        "backend-errors",
+                        "BACKEND_ERROR_OCCURRED",
+                        "BackendErrorOccurredEvent",
+                        {
+                            **common,
+                            "errorCode": code,
+                            "errorName": internal_error.__class__.__name__ if internal_error else "BackendHttpError",
+                            # Public response messages are catalog codes. Internal detail
+                            # stays only in this protected support event.
+                            "errorMessage": (str(internal_error) if internal_error else code)[:2000],
+                            "stackTrace": (
+                                _format_exception(internal_error)[:8000]
+                                if internal_error is not None else None
+                            ),
+                        },
+                        event_id=str(uuid4()),
+                        occurred_at=started_at,
+                    )
+            except Exception:
+                logger.exception("Observability reporting failed for %s", route)
