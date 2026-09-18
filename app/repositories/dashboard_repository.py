@@ -75,6 +75,43 @@ ROW_ACTIVE = 1
 # reports the wrong month is worse than one that errors.
 
 
+#: The buckets `date_trunc` may be given. WHITELISTED, not passed through: the
+#: value is interpolated into the SQL (date_trunc's first argument cannot be a
+#: bind parameter), so an unchecked request string here would be injection.
+GRANULARITIES = ("hour", "day", "week", "month")
+DEFAULT_GRANULARITY = "day"
+
+#: Orders are attributed to a till through `assignment_id`, which is VARCHAR on
+#: the order and UUID on the assignment — hence the cast in every session join.
+#: Note most orders carry no assignment at all (an import does not run through a
+#: till), which is exactly why organization-wide figures are a separate query
+#: rather than a sum over sessions.
+_SESSION_JOIN = """
+            JOIN assignments a
+              ON a.assignment_id = CAST({alias}.assignment_id AS uuid)
+             AND a.session_id = CAST(:session_id AS uuid)
+"""
+
+
+def _scope_sql(scope, alias: str = "o") -> tuple:
+    """(join, where, params) for a scope — one definition, five queries.
+
+    Written once because a scope applied to four panels and forgotten on the
+    fifth is a data leak, not a display bug.
+    """
+    join, where, params = "", "", {}
+    if scope is None:
+        return join, where, params
+
+    if getattr(scope, "session_id", None):
+        join += _SESSION_JOIN.format(alias=alias)
+        params["session_id"] = str(scope.session_id)
+    if getattr(scope, "user_id", None):
+        where += f"\n              AND {alias}.created_by = :scope_user_id"
+        params["scope_user_id"] = str(scope.user_id)
+    return join, where, params
+
+
 class DashboardRepository(DatabaseConnection):
     """Read-only aggregates for the dashboard panels."""
 
@@ -88,6 +125,7 @@ class DashboardRepository(DatabaseConnection):
         organization_id: str,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
+        scope=None,
     ) -> Dict[str, Any]:
         """Revenue, order count and average ticket.
 
@@ -96,24 +134,28 @@ class DashboardRepository(DatabaseConnection):
         revenue, and including them drags the average ticket toward a number that
         describes nothing.
         """
-        query = text("""
+        join, where, scope_params = _scope_sql(scope)
+        query = text(f"""
             SELECT
                 COUNT(*)                                AS orders,
-                COALESCE(SUM(grand_total), 0)           AS revenue,
-                COALESCE(SUM(total_quantities), 0)      AS units,
-                MAX(created_on)                         AS last_order_at
-            FROM crossdocking_orders
-            WHERE company_id = :org_id
-              AND deleted_on IS NULL
-              AND order_status = ANY(:statuses)
-              AND (CAST(:date_from AS date) IS NULL OR created_on >= CAST(:date_from AS date))
-              AND (CAST(:date_to   AS date) IS NULL OR created_on <  CAST(:date_to AS date) + 1)
+                COALESCE(SUM(o.grand_total), 0)         AS revenue,
+                COALESCE(SUM(o.total_quantities), 0)    AS units,
+                MAX(o.created_on)                       AS last_order_at
+            FROM crossdocking_orders o
+            {join}
+            WHERE o.company_id = :org_id
+              AND o.deleted_on IS NULL
+              AND o.order_status = ANY(:statuses)
+              AND (CAST(:date_from AS date) IS NULL OR o.created_on >= CAST(:date_from AS date))
+              AND (CAST(:date_to   AS date) IS NULL OR o.created_on <  CAST(:date_to AS date) + 1)
+              {where}
         """)
         row = self.session.execute(query, {
             "org_id": organization_id,
             "statuses": list(REVENUE_STATUSES),
             "date_from": date_from,
             "date_to": date_to,
+            **scope_params,
         }).one()
 
         orders = int(row.orders or 0)
@@ -128,24 +170,28 @@ class DashboardRepository(DatabaseConnection):
             "last_order_at": row.last_order_at,
         }
 
-    def order_status_breakdown(self, organization_id: str) -> List[Dict[str, Any]]:
+    def order_status_breakdown(self, organization_id: str, scope=None) -> List[Dict[str, Any]]:
         """Every status with its count and value, busiest first.
 
         This is the panel that answers "I have orders in process" — which the old
         dashboard could not show at all, because it only ever reported a single
         revenue total drawn from a table that did not exist.
         """
-        query = text("""
+        join, where, scope_params = _scope_sql(scope)
+        query = text(f"""
             SELECT
-                order_status,
-                COUNT(*)                      AS orders,
-                COALESCE(SUM(grand_total), 0) AS value
-            FROM crossdocking_orders
-            WHERE company_id = :org_id AND deleted_on IS NULL
-            GROUP BY order_status
+                o.order_status,
+                COUNT(*)                        AS orders,
+                COALESCE(SUM(o.grand_total), 0) AS value
+            FROM crossdocking_orders o
+            {join}
+            WHERE o.company_id = :org_id AND o.deleted_on IS NULL
+              {where}
+            GROUP BY o.order_status
             ORDER BY orders DESC
         """)
-        rows = self.session.execute(query, {"org_id": organization_id}).fetchall()
+        rows = self.session.execute(
+            query, {"org_id": organization_id, **scope_params}).fetchall()
         return [
             {
                 "status": row.order_status or "unknown",
@@ -156,14 +202,16 @@ class DashboardRepository(DatabaseConnection):
             for row in rows
         ]
 
-    def top_products(self, organization_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def top_products(self, organization_id: str, limit: int = 10,
+                     scope=None) -> List[Dict[str, Any]]:
         """Best sellers by revenue, from the order lines.
 
         Joined through the orders so the organization filter and the
         revenue-status filter both apply — a ranking that counts cancelled orders
         recommends restocking something nobody bought.
         """
-        query = text("""
+        join, where, scope_params = _scope_sql(scope)
+        query = text(f"""
             SELECT
                 l.product_id,
                 COALESCE(MAX(l.description), MAX(p.name))     AS name,
@@ -172,12 +220,14 @@ class DashboardRepository(DatabaseConnection):
                 COALESCE(SUM(l.line_total), 0)                AS revenue
             FROM crossdocking_order_lines l
             JOIN crossdocking_orders o ON o.order_id = l.order_id
+            {join}
             -- `products` keys on `id`, not `product_id`.
             LEFT JOIN products p ON p.id = l.product_id
             WHERE o.company_id = :org_id
               AND o.deleted_on IS NULL
               AND l.deleted_on IS NULL
               AND o.order_status = ANY(:statuses)
+              {where}
             GROUP BY l.product_id
             ORDER BY revenue DESC
             LIMIT :limit
@@ -186,6 +236,7 @@ class DashboardRepository(DatabaseConnection):
             "org_id": organization_id,
             "statuses": list(REVENUE_STATUSES),
             "limit": limit,
+            **scope_params,
         }).fetchall()
         return [
             {
@@ -198,34 +249,115 @@ class DashboardRepository(DatabaseConnection):
             for row in rows
         ]
 
-    def sales_by_day(self, organization_id: str, days: int = 14) -> List[Dict[str, Any]]:
-        """Revenue per day for the trend chart, oldest first."""
-        query = text("""
+    def sales_trend(
+        self,
+        organization_id: str,
+        granularity: str = DEFAULT_GRANULARITY,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        scope=None,
+    ) -> List[Dict[str, Any]]:
+        """Revenue per bucket, oldest first.
+
+        `granularity` is one of GRANULARITIES and is validated against that tuple
+        here rather than trusted — `date_trunc`'s first argument cannot be a bind
+        parameter, so it has to be interpolated, and an unchecked value would be
+        straightforward SQL injection.
+
+        Buckets come from `created_on`, a real timestamp. Never `creation_date`:
+        that is a VARCHAR of "DD/MM/YYYY" which casts without error and reads the
+        wrong month.
+
+        Gaps are NOT filled. An hour with no sales is absent rather than zero,
+        because a zero row and a missing row mean different things to a chart —
+        and the caller knows the window it asked for.
+        """
+        if granularity not in GRANULARITIES:
+            raise ValueError(
+                f"granularity must be one of {', '.join(GRANULARITIES)}; got {granularity!r}")
+
+        join, where, scope_params = _scope_sql(scope)
+        query = text(f"""
             SELECT
-                CAST(created_on AS date)      AS day,
-                COUNT(*)                      AS orders,
-                COALESCE(SUM(grand_total), 0) AS revenue
-            FROM crossdocking_orders
-            WHERE company_id = :org_id
-              AND deleted_on IS NULL
-              AND order_status = ANY(:statuses)
-              AND created_on >= CURRENT_DATE - CAST(:days AS integer)
-            GROUP BY CAST(created_on AS date)
-            ORDER BY day
+                date_trunc('{granularity}', o.created_on) AS bucket,
+                COUNT(*)                                  AS orders,
+                COALESCE(SUM(o.grand_total), 0)           AS revenue
+            FROM crossdocking_orders o
+            {join}
+            WHERE o.company_id = :org_id
+              AND o.deleted_on IS NULL
+              AND o.order_status = ANY(:statuses)
+              AND (CAST(:date_from AS date) IS NULL OR o.created_on >= CAST(:date_from AS date))
+              AND (CAST(:date_to   AS date) IS NULL OR o.created_on <  CAST(:date_to AS date) + 1)
+              {where}
+            GROUP BY bucket
+            ORDER BY bucket
         """)
         rows = self.session.execute(query, {
             "org_id": organization_id,
             "statuses": list(REVENUE_STATUSES),
-            "days": days,
+            "date_from": date_from,
+            "date_to": date_to,
+            **scope_params,
         }).fetchall()
         return [
             {
-                "day": row.day.isoformat() if row.day else None,
+                # ISO 8601 throughout: the hour buckets need a time component,
+                # and one format for every granularity keeps the client from
+                # having to guess which it got.
+                "bucket": row.bucket.isoformat() if row.bucket else None,
                 "orders": int(row.orders or 0),
                 "revenue": float(row.revenue or 0),
             }
             for row in rows
         ]
+
+    def session_sales(self, organization_id: str, scope=None) -> Dict[str, Any]:
+        """"Ventas de la sesión" — what is on the books right now.
+
+        A different question from revenue, and deliberately a different set:
+        `pending`, `processing` and `shipped` always count, and `delivered`
+        counts only when it was delivered TODAY. A pedido delivered last week is
+        finished business; it should not still be inflating today's session
+        figure.
+
+        ⚠️ `delivery_date` is a VARCHAR holding two different formats
+        ("DD/MM/YYYY" from an Excel import, "YYYY-MM-DD" from a manual order), so
+        "delivered today" cannot be asked of it safely yet — a cast reads the
+        wrong month for any day <= 12. Until that column becomes a real date, a
+        delivered order counts when it was CREATED today, and the response says
+        which rule it used so the UI cannot imply the other one.
+        """
+        join, where, scope_params = _scope_sql(scope)
+        query = text(f"""
+            SELECT
+                COUNT(*)                        AS orders,
+                COALESCE(SUM(o.grand_total), 0) AS revenue
+            FROM crossdocking_orders o
+            {join}
+            WHERE o.company_id = :org_id
+              AND o.deleted_on IS NULL
+              AND (
+                    o.order_status = ANY(:open_statuses)
+                 OR (o.order_status = :delivered AND o.created_on >= CURRENT_DATE)
+              )
+              {where}
+        """)
+        row = self.session.execute(query, {
+            "org_id": organization_id,
+            "open_statuses": list(OPEN_STATUSES),
+            "delivered": OrderStatus.DELIVERED.value,
+            **scope_params,
+        }).one()
+        orders = int(row.orders or 0)
+        revenue = float(row.revenue or 0)
+        return {
+            "orders": orders,
+            "revenue": revenue,
+            "average_ticket": (revenue / orders) if orders else 0.0,
+            # Honest about the approximation above.
+            "delivered_rule": "created_today",
+        }
 
     # ── Live tills ──────────────────────────────────────────────────────────
 

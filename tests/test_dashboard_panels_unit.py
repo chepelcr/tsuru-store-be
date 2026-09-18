@@ -11,6 +11,7 @@ So the first test here is the inverse of the one that was deleted: sales figures
 must survive having nobody on a till.
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -18,10 +19,35 @@ import pytest
 from app.enums.order_status import OrderStatus
 from app.repositories.dashboard_repository import (
     EXCLUDED_STATUSES,
+    GRANULARITIES,
     OPEN_STATUSES,
     REVENUE_STATUSES,
 )
 from app.services import dashboard_service
+
+
+def _role_stub(is_admin: bool) -> SimpleNamespace:
+    """Stand in for the role repository inside `dashboard_scope` only.
+
+    Rebinding the NAME in `dashboard_scope` rather than setting an attribute on
+    the shared module matters: mutating the module would also replace
+    `caller_role_repository.is_admin` for the tests below that exercise the real
+    one, and they would silently assert against the stub.
+    """
+    return SimpleNamespace(is_admin=lambda organization_id, user_id: is_admin)
+
+
+@pytest.fixture(autouse=True)
+def _admin(monkeypatch):
+    """Default the caller to an admin so scope-agnostic tests stay readable.
+
+    The enforcement tests below override it.
+    """
+    from app.repositories import caller_role_repository
+
+    caller_role_repository.clear_cache()
+    monkeypatch.setattr(
+        "app.services.dashboard_scope.caller_role_repository", _role_stub(True))
 
 
 @pytest.fixture
@@ -97,8 +123,11 @@ class TestSalesSummary:
 
     def test_passes_the_date_window_through(self, repo):
         repo.sales_summary.return_value = _summary()
-        dashboard_service.get_sales_summary("org-1", "2026-09-01", "2026-09-30")
-        repo.sales_summary.assert_called_once_with("org-1", "2026-09-01", "2026-09-30")
+        dashboard_service.get_sales_summary(
+            "org-1", "admin-1", date_from="2026-09-01", date_to="2026-09-30")
+        args, kwargs = repo.sales_summary.call_args
+        assert args[:3] == ("org-1", "2026-09-01", "2026-09-30")
+        assert kwargs["scope"].organization_id == "org-1"
 
     def test_cancelled_is_not_revenue(self):
         """A cancelled order is not income and must not enter the average ticket."""
@@ -147,23 +176,159 @@ class TestTopProducts:
     def test_clamps_the_limit(self, repo, asked, expected):
         """A client-supplied limit is clamped, not trusted."""
         repo.top_products.return_value = []
-        dashboard_service.get_top_products("org-1", asked)
+        dashboard_service.get_top_products("org-1", "admin-1", limit=asked)
         assert repo.top_products.call_args[0][1] == expected
 
 
 class TestSalesTrend:
-    def test_maps_days(self, repo):
-        repo.sales_by_day.return_value = [
-            {"day": "2026-09-01", "orders": 2, "revenue": 170128.28},
+    def test_maps_buckets_and_echoes_the_window(self, repo):
+        repo.sales_trend.return_value = [
+            {"bucket": "2026-09-01T00:00:00", "orders": 2, "revenue": 170128.28},
         ]
-        result = dashboard_service.get_sales_trend("org-1")
-        assert result.days[0].day == "2026-09-01"
+        result = dashboard_service.get_sales_trend(
+            "org-1", "admin-1", granularity="day",
+            date_from="2026-09-01", date_to="2026-09-30")
 
-    @pytest.mark.parametrize("asked,expected", [(0, 14), (-1, 1), (14, 14), (365, 90)])
-    def test_clamps_the_window(self, repo, asked, expected):
-        repo.sales_by_day.return_value = []
-        dashboard_service.get_sales_trend("org-1", asked)
-        assert repo.sales_by_day.call_args[0][1] == expected
+        assert result.points[0].bucket == "2026-09-01T00:00:00"
+        # The response states what it is, so a chart cannot mislabel its axis.
+        assert result.granularity == "day"
+        assert (result.date_from, result.date_to) == ("2026-09-01", "2026-09-30")
+
+    @pytest.mark.parametrize("granularity", list(GRANULARITIES))
+    def test_every_granularity_reaches_the_repository(self, repo, granularity):
+        repo.sales_trend.return_value = []
+        dashboard_service.get_sales_trend("org-1", "admin-1", granularity=granularity)
+        assert repo.sales_trend.call_args[0][1] == granularity
+
+    def test_granularity_is_whitelisted_at_the_repository(self):
+        """The real guard lives in SQL-building, not in the route.
+
+        `date_trunc`'s first argument cannot be a bind parameter, so it is
+        interpolated — an unvalidated value there is injection. The repository
+        raises rather than formatting whatever it was handed.
+        """
+        from app.repositories.dashboard_repository import DashboardRepository
+
+        with pytest.raises(ValueError, match="granularity must be one of"):
+            DashboardRepository.sales_trend(
+                MagicMock(), "org-1", "day'; DROP TABLE crossdocking_orders--")
+
+
+class TestScopeEnforcement:
+    """A non-admin must not be able to widen their view by asking.
+
+    This is the test the feature exists for: the frontend already sends the right
+    filters, but anyone can call the endpoint directly, so a restriction applied
+    only in the client is decoration.
+    """
+
+    @pytest.fixture
+    def cashier(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.services.dashboard_scope.caller_role_repository", _role_stub(False))
+
+    def test_cashier_asking_for_another_user_gets_themselves(self, repo, cashier):
+        repo.sales_summary.return_value = _summary()
+        result = dashboard_service.get_sales_summary(
+            "org-1", "cashier-1", session_id="s-1", user_id="somebody-else")
+
+        scope = repo.sales_summary.call_args[1]["scope"]
+        assert scope.user_id == "cashier-1"       # not "somebody-else"
+        assert scope.session_id == "s-1"          # the session itself is allowed
+        assert result.scope.scope == "session_user"
+        assert result.scope.is_admin is False
+
+    def test_cashier_asking_for_a_whole_session_is_narrowed(self, repo, cashier):
+        repo.order_status_breakdown.return_value = []
+        dashboard_service.get_order_status("org-1", "cashier-1", session_id="s-1")
+
+        scope = repo.order_status_breakdown.call_args[1]["scope"]
+        assert scope.user_id == "cashier-1"
+
+    def test_cashier_without_a_session_still_sees_only_their_own(self, repo, cashier):
+        """"What have I sold" is the honest answer when not in a session."""
+        repo.sales_summary.return_value = _summary()
+        dashboard_service.get_sales_summary("org-1", "cashier-1")
+        assert repo.sales_summary.call_args[1]["scope"].user_id == "cashier-1"
+
+    def test_admin_may_see_the_whole_session(self, repo):
+        repo.sales_summary.return_value = _summary()
+        result = dashboard_service.get_sales_summary("org-1", "admin-1", session_id="s-1")
+
+        scope = repo.sales_summary.call_args[1]["scope"]
+        assert scope.user_id is None
+        assert result.scope.scope == "session"
+
+    def test_admin_may_look_at_one_person(self, repo):
+        """A legitimate question about their own staff."""
+        repo.sales_summary.return_value = _summary()
+        dashboard_service.get_sales_summary(
+            "org-1", "admin-1", session_id="s-1", user_id="cashier-2")
+        assert repo.sales_summary.call_args[1]["scope"].user_id == "cashier-2"
+
+    def test_an_unresolvable_role_fails_closed(self, monkeypatch):
+        """A lookup failure must narrow the view, never widen it.
+
+        Asserted on the role repository itself rather than through the service:
+        this is the decision point, and defaulting to admin when the check breaks
+        would turn a database blip into a data leak.
+        """
+        from app.repositories import caller_role_repository
+
+        caller_role_repository.clear_cache()
+        monkeypatch.setattr(
+            caller_role_repository, "_lookup",
+            lambda organization_id, user_id: (_ for _ in ()).throw(RuntimeError("db down")),
+        )
+        assert caller_role_repository.is_admin("org-1", "someone") is False
+
+    def test_a_failed_lookup_is_not_cached(self, monkeypatch):
+        """A transient failure must not pin the caller to non-admin for 5 minutes."""
+        from app.repositories import caller_role_repository
+
+        caller_role_repository.clear_cache()
+        calls = {"n": 0}
+
+        def flaky(organization_id, user_id):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("db down")
+            return True
+
+        monkeypatch.setattr(caller_role_repository, "_lookup", flaky)
+        assert caller_role_repository.is_admin("org-1", "someone") is False
+        assert caller_role_repository.is_admin("org-1", "someone") is True
+        assert calls["n"] == 2
+
+    def test_a_resolved_role_is_cached(self, monkeypatch):
+        from app.repositories import caller_role_repository
+
+        caller_role_repository.clear_cache()
+        calls = {"n": 0}
+
+        def counted(organization_id, user_id):
+            calls["n"] += 1
+            return True
+
+        monkeypatch.setattr(caller_role_repository, "_lookup", counted)
+        caller_role_repository.is_admin("org-1", "someone")
+        caller_role_repository.is_admin("org-1", "someone")
+        assert calls["n"] == 1
+
+
+class TestSessionSales:
+    """Pending/processing/shipped, plus deliveries from today only."""
+
+    def test_reports_the_rule_it_used(self, repo):
+        repo.session_sales.return_value = {
+            "orders": 4, "revenue": 373069.5,
+            "average_ticket": 93267.375, "delivered_rule": "created_today",
+        }
+        result = dashboard_service.get_session_sales("org-1", "admin-1")
+        assert result.orders == 4
+        # Stated, not implied: `delivery_date` is still a two-format string that
+        # cannot be compared, so "delivered today" is approximated by creation.
+        assert result.delivered_rule == "created_today"
 
 
 class TestStations:

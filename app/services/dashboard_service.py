@@ -27,12 +27,18 @@ from app.dtos.responses.dashboard_panels_dto import (
     SalesSummaryResponse,
     SalesTrendPoint,
     SalesTrendResponse,
+    ScopeInfo,
+    SessionSalesResponse,
     StationItem,
     StationsResponse,
     TopProductItem,
     TopProductsResponse,
 )
-from app.repositories.dashboard_repository import DashboardRepository
+from app.repositories.dashboard_repository import (
+    DEFAULT_GRANULARITY,
+    DashboardRepository,
+)
+from app.services.dashboard_scope import DashboardScope, resolve as resolve_scope
 
 logger = logging.getLogger(__name__)
 
@@ -40,43 +46,103 @@ MAX_TOP_PRODUCTS = 50
 MAX_TREND_DAYS = 90
 
 
+def _scope_info(scope: DashboardScope) -> ScopeInfo:
+    """Echo the scope the server actually applied, not the one requested."""
+    return ScopeInfo(
+        scope=scope.describe(),
+        session_id=scope.session_id,
+        user_id=scope.user_id,
+        is_admin=scope.is_admin,
+    )
+
+
 def get_sales_summary(
     organization_id: str,
+    caller_user_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    session_id: Optional[str] = None,
+    user_id: Optional[str] = None,
 ) -> SalesSummaryResponse:
     """Revenue, order count and average ticket, from the orders themselves."""
+    scope = resolve_scope(organization_id, caller_user_id, session_id, user_id)
     with DashboardRepository() as repo:
-        return SalesSummaryResponse(**repo.sales_summary(organization_id, date_from, date_to))
+        data = repo.sales_summary(organization_id, date_from, date_to, scope=scope)
+    return SalesSummaryResponse(**data, scope=_scope_info(scope))
 
 
-def get_order_status(organization_id: str) -> OrderStatusResponse:
+def get_order_status(
+    organization_id: str,
+    caller_user_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+) -> OrderStatusResponse:
     """Order counts per status, with the in-flight totals rolled up."""
+    scope = resolve_scope(organization_id, caller_user_id, session_id, user_id)
     with DashboardRepository() as repo:
-        rows = repo.order_status_breakdown(organization_id)
+        rows = repo.order_status_breakdown(organization_id, scope=scope)
 
     statuses = [OrderStatusCount(**row) for row in rows]
     return OrderStatusResponse(
         statuses=statuses,
         open_orders=sum(s.orders for s in statuses if s.is_open),
         open_value=sum(s.value for s in statuses if s.is_open),
+        scope=_scope_info(scope),
     )
 
 
-def get_top_products(organization_id: str, limit: int = 10) -> TopProductsResponse:
+def get_top_products(
+    organization_id: str,
+    caller_user_id: Optional[str] = None,
+    limit: int = 10,
+    session_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+) -> TopProductsResponse:
     """Best sellers by revenue. `limit` is clamped, not trusted."""
     limit = max(1, min(int(limit or 10), MAX_TOP_PRODUCTS))
+    scope = resolve_scope(organization_id, caller_user_id, session_id, user_id)
     with DashboardRepository() as repo:
-        rows = repo.top_products(organization_id, limit)
-    return TopProductsResponse(products=[TopProductItem(**row) for row in rows])
+        rows = repo.top_products(organization_id, limit, scope=scope)
+    return TopProductsResponse(
+        products=[TopProductItem(**row) for row in rows],
+        scope=_scope_info(scope),
+    )
 
 
-def get_sales_trend(organization_id: str, days: int = 14) -> SalesTrendResponse:
-    """Daily revenue for the chart."""
-    days = max(1, min(int(days or 14), MAX_TREND_DAYS))
+def get_sales_trend(
+    organization_id: str,
+    caller_user_id: Optional[str] = None,
+    granularity: str = DEFAULT_GRANULARITY,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    session_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+) -> SalesTrendResponse:
+    """Revenue per bucket for the chart, at the requested granularity."""
+    scope = resolve_scope(organization_id, caller_user_id, session_id, user_id)
     with DashboardRepository() as repo:
-        rows = repo.sales_by_day(organization_id, days)
-    return SalesTrendResponse(days=[SalesTrendPoint(**row) for row in rows])
+        rows = repo.sales_trend(
+            organization_id, granularity, date_from, date_to, scope=scope)
+    return SalesTrendResponse(
+        granularity=granularity,
+        date_from=date_from,
+        date_to=date_to,
+        points=[SalesTrendPoint(**row) for row in rows],
+        scope=_scope_info(scope),
+    )
+
+
+def get_session_sales(
+    organization_id: str,
+    caller_user_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+) -> SessionSalesResponse:
+    """"Ventas de la sesión" — pending/processing/shipped, plus today's deliveries."""
+    scope = resolve_scope(organization_id, caller_user_id, session_id, user_id)
+    with DashboardRepository() as repo:
+        data = repo.session_sales(organization_id, scope=scope)
+    return SessionSalesResponse(**data, scope=_scope_info(scope))
 
 
 def get_stations(organization_id: str,
@@ -107,9 +173,12 @@ def get_dashboard_data(
     organization's REAL totals instead of the zeros it returned whenever no
     cashier had a till open.
     """
-    summary = get_sales_summary(organization_id)
+    # The caller is passed through so the deprecated payload obeys the same
+    # scope rules as the panels — a non-admin must not get wider figures by
+    # calling the old endpoint instead of the new ones.
+    summary = get_sales_summary(organization_id, user_id)
     stations = get_stations(organization_id, session_id)
-    products = get_top_products(organization_id, limit=10)
+    products = get_top_products(organization_id, user_id, limit=10)
 
     return DashboardDataResponse(
         stands=[

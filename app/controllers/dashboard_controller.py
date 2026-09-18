@@ -13,8 +13,15 @@ with nothing to show cannot blank the ones beside it:
     /dashboard/sales-summary   what we have sold
     /dashboard/order-status    what is in flight  (the "4 in process" panel)
     /dashboard/top-products    what is selling
-    /dashboard/sales-trend     the chart
+    /dashboard/sales-trend     the chart, at hour / day / week / month
+    /dashboard/session-sales   "ventas de la sesión" — open plus today's deliveries
     /dashboard/stations        who is on a till right now
+
+Every panel accepts an optional `session_id` and `user_id`, and **the server
+decides what they mean**: only an admin may see past their own rows, so a
+cashier asking for session-wide figures is narrowed to their own rather than
+refused. The scope actually applied comes back on the response, so the client can
+label the figures instead of guessing. See `services/dashboard_scope.py`.
 """
 
 from __future__ import annotations
@@ -29,9 +36,11 @@ from app.dtos.responses.dashboard_panels_dto import (
     OrderStatusResponse,
     SalesSummaryResponse,
     SalesTrendResponse,
+    SessionSalesResponse,
     StationsResponse,
     TopProductsResponse,
 )
+from app.repositories.dashboard_repository import DEFAULT_GRANULARITY, GRANULARITIES
 from app.services import dashboard_service
 
 logger = logging.getLogger(__name__)
@@ -67,10 +76,13 @@ class DashboardController:
             x_user_id: Annotated[str, Header(description="User identifier from header")],
             date_from: Optional[str] = Query(None, description="ISO date, inclusive"),
             date_to: Optional[str] = Query(None, description="ISO date, inclusive"),
+            session_id: Optional[str] = Query(None, description="Scope to one session"),
+            user_id: Optional[str] = Query(
+                None, description="Scope to one person (admins only; ignored otherwise)"),
         ):
             return _guard(
                 lambda: dashboard_service.get_sales_summary(
-                    organization_id, date_from, date_to),
+                    organization_id, x_user_id, date_from, date_to, session_id, user_id),
                 "sales summary",
             )
 
@@ -89,9 +101,13 @@ class DashboardController:
         async def get_order_status(
             organization_id: Annotated[str, Path(description="Organization identifier")],
             x_user_id: Annotated[str, Header(description="User identifier from header")],
+            session_id: Optional[str] = Query(None, description="Scope to one session"),
+            user_id: Optional[str] = Query(
+                None, description="Scope to one person (admins only; ignored otherwise)"),
         ):
             return _guard(
-                lambda: dashboard_service.get_order_status(organization_id),
+                lambda: dashboard_service.get_order_status(
+                    organization_id, x_user_id, session_id, user_id),
                 "order status breakdown",
             )
 
@@ -110,9 +126,13 @@ class DashboardController:
             organization_id: Annotated[str, Path(description="Organization identifier")],
             x_user_id: Annotated[str, Header(description="User identifier from header")],
             limit: int = Query(10, ge=1, le=50, description="How many products"),
+            session_id: Optional[str] = Query(None, description="Scope to one session"),
+            user_id: Optional[str] = Query(
+                None, description="Scope to one person (admins only; ignored otherwise)"),
         ):
             return _guard(
-                lambda: dashboard_service.get_top_products(organization_id, limit),
+                lambda: dashboard_service.get_top_products(
+                    organization_id, x_user_id, limit, session_id, user_id),
                 "top products",
             )
 
@@ -120,17 +140,76 @@ class DashboardController:
             f"{ORG}/sales-trend",
             response_model=SalesTrendResponse,
             tags=["dashboard"],
-            summary="Daily revenue for the trend chart",
-            description="Revenue and order count per day, oldest first.",
+            summary="Revenue per hour, day, week or month",
+            description=(
+                "Revenue and order count per bucket, oldest first.\n\n"
+                "`granularity` is one of `hour`, `day`, `week`, `month`. Combine "
+                "it with `date_from`/`date_to` (ISO dates, inclusive) for a chosen "
+                "period — `hour` over a single day, `month` over a year.\n\n"
+                "Buckets with no sales are ABSENT rather than zero: a missing "
+                "bucket and a zero bucket are different facts, and the caller "
+                "knows the window it asked for. Bucket starts are ISO 8601 with a "
+                "time component at every granularity, so a client never has to "
+                "guess which shape it received."
+            ),
         )
         async def get_sales_trend(
             organization_id: Annotated[str, Path(description="Organization identifier")],
             x_user_id: Annotated[str, Header(description="User identifier from header")],
-            days: int = Query(14, ge=1, le=90, description="How many days back"),
+            granularity: str = Query(
+                DEFAULT_GRANULARITY,
+                description=f"One of: {', '.join(GRANULARITIES)}",
+            ),
+            date_from: Optional[str] = Query(None, description="ISO date, inclusive"),
+            date_to: Optional[str] = Query(None, description="ISO date, inclusive"),
+            session_id: Optional[str] = Query(None, description="Scope to one session"),
+            user_id: Optional[str] = Query(
+                None, description="Scope to one person (admins only; ignored otherwise)"),
+        ):
+            # Rejected here as a 400 rather than reaching the repository's
+            # ValueError, which `_guard` would also turn into a 400 — this just
+            # says which values are legal.
+            if granularity not in GRANULARITIES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"granularity must be one of: {', '.join(GRANULARITIES)}",
+                )
+            return _guard(
+                lambda: dashboard_service.get_sales_trend(
+                    organization_id, x_user_id, granularity,
+                    date_from, date_to, session_id, user_id),
+                "sales trend",
+            )
+
+        @app.get(
+            f"{ORG}/session-sales",
+            response_model=SessionSalesResponse,
+            tags=["dashboard"],
+            summary='"Ventas de la sesión" — what is on the books now',
+            description=(
+                "A different question from revenue, and a different set of "
+                "statuses: `pending`, `processing` and `shipped` always count, and "
+                "`delivered` counts only when it was delivered TODAY. A pedido "
+                "delivered last week is finished business and should not still be "
+                "inflating today's figure.\n\n"
+                "`delivered_rule` says which rule was applied. It reads "
+                "`created_today` for now: `delivery_date` is a VARCHAR holding two "
+                "different formats, so it cannot be compared to today without "
+                "misreading the month, and the response says so rather than "
+                "implying a delivery-date rule it is not yet applying."
+            ),
+        )
+        async def get_session_sales(
+            organization_id: Annotated[str, Path(description="Organization identifier")],
+            x_user_id: Annotated[str, Header(description="User identifier from header")],
+            session_id: Optional[str] = Query(None, description="Scope to one session"),
+            user_id: Optional[str] = Query(
+                None, description="Scope to one person (admins only; ignored otherwise)"),
         ):
             return _guard(
-                lambda: dashboard_service.get_sales_trend(organization_id, days),
-                "sales trend",
+                lambda: dashboard_service.get_session_sales(
+                    organization_id, x_user_id, session_id, user_id),
+                "session sales",
             )
 
         @app.get(

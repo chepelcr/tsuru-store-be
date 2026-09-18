@@ -15,6 +15,26 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ScopeInfo(BaseModel):
+    """What slice the server actually answered for.
+
+    Returned on every panel because the request does not decide it — a non-admin
+    asking for a whole session is narrowed to their own rows. The client needs to
+    know which it got, or it will label one as the other.
+    """
+
+    scope: str = Field(
+        ...,
+        description="organization | session | session_user",
+        examples=["session_user"],
+    )
+    session_id: Optional[str] = Field(None, description="Session the figures cover")
+    user_id: Optional[str] = Field(None, description="Set when narrowed to one person")
+    is_admin: bool = Field(False, description="Whether the caller may widen the scope")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
 class SalesSummaryResponse(BaseModel):
     """What the organization has actually sold."""
 
@@ -28,6 +48,7 @@ class SalesSummaryResponse(BaseModel):
     units: float = Field(0, description="Total quantities sold", examples=[529])
     last_order_at: Optional[datetime] = Field(
         None, description="When the most recent counted order was created")
+    scope: Optional[ScopeInfo] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -51,6 +72,7 @@ class OrderStatusResponse(BaseModel):
     statuses: List[OrderStatusCount] = Field(default_factory=list)
     open_orders: int = Field(0, description="Total orders in an in-flight status")
     open_value: float = Field(0, description="Value of those in-flight orders")
+    scope: Optional[ScopeInfo] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -71,14 +93,23 @@ class TopProductsResponse(BaseModel):
     """Best sellers by revenue."""
 
     products: List[TopProductItem] = Field(default_factory=list)
+    scope: Optional[ScopeInfo] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class SalesTrendPoint(BaseModel):
-    """Revenue for one day."""
+    """Revenue for one bucket of the requested granularity."""
 
-    day: Optional[str] = Field(None, description="ISO date", examples=["2026-09-14"])
+    bucket: Optional[str] = Field(
+        None,
+        description=(
+            "Start of the bucket, ISO 8601. Always carries a time component so "
+            "hour buckets are unambiguous and one format covers every "
+            "granularity."
+        ),
+        examples=["2026-09-14T00:00:00"],
+    )
     orders: int = Field(..., examples=[3])
     revenue: float = Field(..., examples=[125000.0])
 
@@ -86,9 +117,40 @@ class SalesTrendPoint(BaseModel):
 
 
 class SalesTrendResponse(BaseModel):
-    """Daily revenue, oldest first."""
+    """Revenue per bucket, oldest first.
 
-    days: List[SalesTrendPoint] = Field(default_factory=list)
+    Buckets with no sales are ABSENT rather than zero: a missing bucket and a
+    zero bucket are different facts, and the caller knows the window it asked
+    for.
+    """
+
+    granularity: str = Field(..., description="hour | day | week | month",
+                             examples=["day"])
+    date_from: Optional[str] = Field(None, description="Window start, if given")
+    date_to: Optional[str] = Field(None, description="Window end, if given")
+    points: List[SalesTrendPoint] = Field(default_factory=list)
+    scope: Optional[ScopeInfo] = None
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class SessionSalesResponse(BaseModel):
+    """"Ventas de la sesión" — what is on the books right now."""
+
+    orders: int = Field(..., examples=[4])
+    revenue: float = Field(..., examples=[373069.5])
+    average_ticket: float = Field(..., examples=[93267.37])
+    delivered_rule: str = Field(
+        ...,
+        description=(
+            "Which rule decided whether a DELIVERED order counted. "
+            "`delivery_date_today` once that column is a real date; "
+            "`created_today` while it is still a two-format string that cannot "
+            "be compared safely."
+        ),
+        examples=["created_today"],
+    )
+    scope: Optional[ScopeInfo] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
