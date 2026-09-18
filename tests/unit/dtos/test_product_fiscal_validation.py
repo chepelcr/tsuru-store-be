@@ -164,3 +164,55 @@ class TestSpecialFields:
                 "tax_amount": {"id": "ta-1", "amount": 100.0},
             },
         }])
+
+class TestNonFiscalProducts:
+    """A product must be storable with NO fiscal information at all.
+
+    Not every organization issues electronic documents — the POS has a fiscal
+    toggle, and an org that is not registered with Hacienda still needs a
+    catalogue, an inventory and a price. Every rule above is therefore
+    conditional on the fiscal data being PRESENT; none of them may become a
+    requirement to supply it.
+
+    These are the cases that would break a shop that only sells, so they are
+    pinned explicitly rather than left to follow from the others.
+    """
+
+    def test_a_product_with_no_fiscal_information_is_accepted(self):
+        ProductRequestDTO.model_validate({"name": "Camisa", "price": 5000})
+
+    def test_explicit_nulls_are_accepted(self):
+        ProductRequestDTO.model_validate(
+            {"name": "Camisa", "price": 5000, "taxes": None, "discounts": None}
+        )
+
+    def test_empty_lists_are_accepted(self):
+        ProductRequestDTO.model_validate(
+            {"name": "Camisa", "price": 5000, "taxes": [], "discounts": []}
+        )
+
+    def test_inventory_without_any_tax_is_accepted(self):
+        ProductRequestDTO.model_validate({
+            "name": "Camisa", "price": 5000,
+            "track_inventory": True, "stock_quantity": 10,
+        })
+
+    def test_an_ordinary_discount_without_taxes_is_accepted(self):
+        # The free-goods rule must not fire on a nature that is not free goods.
+        ProductRequestDTO.model_validate({
+            "name": "Camisa", "price": 5000,
+            "discounts": [{"discount_type_id": "07", "percentage": 10}],
+        })
+
+    def test_a_non_iva_tax_alone_is_accepted(self):
+        # The IVA rules must not fire on a product that carries no IVA.
+        ProductRequestDTO.model_validate({
+            "name": "Camisa", "price": 5000,
+            "taxes": [{"tax_type_id": "02", "rate": 10}],
+        })
+
+    def test_no_cabys_is_accepted(self):
+        # CABYS is mandatory on a DOCUMENT, not in a catalogue an unregistered
+        # org keeps. Reprocess and the backfills fill it in when one is needed.
+        ProductRequestDTO.model_validate({"name": "Camisa", "price": 5000, "cabys_id": None})
+

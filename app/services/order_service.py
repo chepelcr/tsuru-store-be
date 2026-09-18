@@ -1708,6 +1708,24 @@ def create_manual_order(
             )
 
         order = repo.save(order)
+
+        # A pedido captured in the POS gets its PDF here, exactly as an imported
+        # one does. Only the import path generated it, so a hand-captured order
+        # had no document to send or print — the difference was in how the order
+        # was created, which is not something the person receiving it can see.
+        #
+        # Best-effort, and deliberately AFTER the save: the order exists whether or
+        # not the render succeeds, and `get_order` already back-fills a missing
+        # pdf_url on the next read. Failing the creation over a PDF would lose a
+        # pedido the cashier has already taken.
+        try:
+            order.pdf_url = create_order_pdf(order)
+            order = repo.save(order)
+        except Exception as error:  # noqa: BLE001 — never fail the order for this
+            logger.warning(
+                "PDF generation failed for manual order %s: %s", document_number, error
+            )
+
         return order_to_response(order)
 
 
