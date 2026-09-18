@@ -1,3 +1,16 @@
+"""Dashboard panels — one function per question the dashboard asks.
+
+Previously this was a single `get_dashboard_data` that answered everything or
+nothing, and it chose nothing: the sales figures were computed by walking active
+session -> active assignment -> orders-for-that-assignment, so an organization
+with 45 orders and no open till reported zero revenue, zero orders and a zero
+average ticket. The tables it aggregated from (`sales_orders`, `order_items`) did
+not even exist in this database, and the failure was swallowed.
+
+Each function here is independent, so a panel that has nothing to show says so
+without silencing the others.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -5,12 +18,78 @@ from typing import Optional
 
 from app.dtos.responses.dashboard_data_dto import (
     DashboardDataResponse,
-    StandData,
     ProductRanking,
+    StandData,
+)
+from app.dtos.responses.dashboard_panels_dto import (
+    OrderStatusCount,
+    OrderStatusResponse,
+    SalesSummaryResponse,
+    SalesTrendPoint,
+    SalesTrendResponse,
+    StationItem,
+    StationsResponse,
+    TopProductItem,
+    TopProductsResponse,
 )
 from app.repositories.dashboard_repository import DashboardRepository
 
 logger = logging.getLogger(__name__)
+
+MAX_TOP_PRODUCTS = 50
+MAX_TREND_DAYS = 90
+
+
+def get_sales_summary(
+    organization_id: str,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+) -> SalesSummaryResponse:
+    """Revenue, order count and average ticket, from the orders themselves."""
+    with DashboardRepository() as repo:
+        return SalesSummaryResponse(**repo.sales_summary(organization_id, date_from, date_to))
+
+
+def get_order_status(organization_id: str) -> OrderStatusResponse:
+    """Order counts per status, with the in-flight totals rolled up."""
+    with DashboardRepository() as repo:
+        rows = repo.order_status_breakdown(organization_id)
+
+    statuses = [OrderStatusCount(**row) for row in rows]
+    return OrderStatusResponse(
+        statuses=statuses,
+        open_orders=sum(s.orders for s in statuses if s.is_open),
+        open_value=sum(s.value for s in statuses if s.is_open),
+    )
+
+
+def get_top_products(organization_id: str, limit: int = 10) -> TopProductsResponse:
+    """Best sellers by revenue. `limit` is clamped, not trusted."""
+    limit = max(1, min(int(limit or 10), MAX_TOP_PRODUCTS))
+    with DashboardRepository() as repo:
+        rows = repo.top_products(organization_id, limit)
+    return TopProductsResponse(products=[TopProductItem(**row) for row in rows])
+
+
+def get_sales_trend(organization_id: str, days: int = 14) -> SalesTrendResponse:
+    """Daily revenue for the chart."""
+    days = max(1, min(int(days or 14), MAX_TREND_DAYS))
+    with DashboardRepository() as repo:
+        rows = repo.sales_by_day(organization_id, days)
+    return SalesTrendResponse(days=[SalesTrendPoint(**row) for row in rows])
+
+
+def get_stations(organization_id: str,
+                 session_id: Optional[str] = None) -> StationsResponse:
+    """Who is on a till right now, and their takings on it."""
+    with DashboardRepository() as repo:
+        rows = repo.active_stations(organization_id, session_id)
+
+    stations = [StationItem(**row) for row in rows]
+    return StationsResponse(
+        stations=stations,
+        active_sessions=len({s.session_id for s in stations}),
+    )
 
 
 def get_dashboard_data(
@@ -18,108 +97,53 @@ def get_dashboard_data(
     user_id: str,
     session_id: Optional[str] = None,
 ) -> DashboardDataResponse:
-    """Get real-time dashboard data for an organization.
-    
-    This aggregates data from active sessions, assignments, and sales orders
-    to provide a comprehensive view of current sales performance.
-    
-    Args:
-        organization_id: Organization identifier
-        user_id: User requesting the data (for authorization)
-        session_id: Optional specific session ID to filter
-        
-    Returns:
-        DashboardDataResponse with stands, totals, and product rankings
+    """DEPRECATED — the old single-payload dashboard, composed from the panels.
+
+    Kept for one release so a deployed client does not break the moment the
+    panels ship; new callers should use the five panel endpoints, which each
+    load and fail independently.
+
+    It is composed rather than left as it was, so it now reports the
+    organization's REAL totals instead of the zeros it returned whenever no
+    cashier had a till open.
     """
-    with DashboardRepository() as repo:
-        # Step 1: Get active sessions
-        sessions = repo.get_active_sessions(organization_id, session_id)
-        
-        if not sessions:
-            # No active sessions, return empty dashboard
-            return DashboardDataResponse(
-                stands=[],
-                total_revenue=0.0,
-                total_sales=0,
-                avg_ticket=0.0,
-                product_ranking=[],
+    summary = get_sales_summary(organization_id)
+    stations = get_stations(organization_id, session_id)
+    products = get_top_products(organization_id, limit=10)
+
+    return DashboardDataResponse(
+        stands=[
+            StandData(
+                id=station.branch_id or station.assignment_id,
+                name=station.session_name or "",
+                # The old shape wanted a cashier NAME; only the id is available
+                # here, and inventing a lookup for a deprecated payload is not
+                # worth a join. The panel endpoint carries `user_id`.
+                cashier_name=station.user_id or "",
+                context=station.session_context,
+                total_revenue=station.revenue,
+                sales_count=station.orders,
+                # Payment-method splits are not part of the panels: nothing read
+                # them, and `payments` on an order is a JSON column that would
+                # need its own aggregate to be meaningful.
+                cash=0.0,
+                sinpe=0.0,
+                card=0.0,
+                last_sync_at=int(station.last_order_at.timestamp() * 1000)
+                if station.last_order_at else 0,
             )
-        
-        session_ids = [s["session_id"] for s in sessions]
-        
-        # Step 2: Get active assignments for these sessions
-        assignments = repo.get_active_assignments_for_sessions(session_ids)
-        
-        if not assignments:
-            # No active assignments, return empty dashboard
-            return DashboardDataResponse(
-                stands=[],
-                total_revenue=0.0,
-                total_sales=0,
-                avg_ticket=0.0,
-                product_ranking=[],
-            )
-        
-        assignment_ids = [a["assignment_id"] for a in assignments]
-        
-        # Step 3: Aggregate sales by assignment
-        sales_by_assignment = repo.aggregate_sales_by_assignment(assignment_ids)
-        
-        # Step 4: Build stands data
-        stands = []
-        total_revenue = 0.0
-        total_sales = 0
-        
-        # Create a map of session_id to context for quick lookup
-        session_context_map = {s["session_id"]: s["context"] for s in sessions}
-        
-        for assignment in assignments:
-            assignment_id = assignment["assignment_id"]
-            sales_data = sales_by_assignment.get(assignment_id, {
-                "sales_count": 0,
-                "total_revenue": 0.0,
-                "cash": 0.0,
-                "sinpe": 0.0,
-                "card": 0.0,
-                "last_sync_at": 0,
-            })
-            
-            stand = StandData(
-                id=assignment["branch_id"],
-                name=assignment["branch_name"],
-                cashier_name=assignment["cashier_name"],
-                context=session_context_map.get(assignment["session_id"], ""),
-                total_revenue=sales_data["total_revenue"],
-                sales_count=sales_data["sales_count"],
-                cash=sales_data["cash"],
-                sinpe=sales_data["sinpe"],
-                card=sales_data["card"],
-                last_sync_at=sales_data["last_sync_at"],
-            )
-            stands.append(stand)
-            
-            total_revenue += sales_data["total_revenue"]
-            total_sales += sales_data["sales_count"]
-        
-        # Step 5: Calculate average ticket
-        avg_ticket = total_revenue / total_sales if total_sales > 0 else 0.0
-        
-        # Step 6: Get product ranking
-        product_ranking_data = repo.calculate_product_ranking(session_ids, limit=10)
-        product_ranking = [
+            for station in stations.stations
+        ],
+        total_revenue=summary.revenue,
+        total_sales=summary.orders,
+        avg_ticket=summary.average_ticket,
+        product_ranking=[
             ProductRanking(
-                name=p["name"],
-                emoji=p["emoji"],
-                units=p["units"],
-                revenue=p["revenue"],
+                name=item.name,
+                emoji=item.image_url,
+                units=int(item.units),
+                revenue=item.revenue,
             )
-            for p in product_ranking_data
-        ]
-        
-        return DashboardDataResponse(
-            stands=stands,
-            total_revenue=total_revenue,
-            total_sales=total_sales,
-            avg_ticket=avg_ticket,
-            product_ranking=product_ranking,
-        )
+            for item in products.products
+        ],
+    )
