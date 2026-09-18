@@ -28,15 +28,42 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 
 from app.configuration.database_connection import DatabaseConnection
+from app.enums.order_status import OrderStatus
 
 logger = logging.getLogger(__name__)
 
-# `order_status` values that represent money actually earned. A cancelled order
-# is not revenue, and counting it inflates both the total and the average ticket.
-REVENUE_STATUSES = ("delivered", "invoiced", "completed")
+# These sets are built FROM the enum, never from string literals.
+#
+# The first version of this file spelled them out by hand and got them wrong:
+# "invoiced", "completed", "in_progress", "dispatched" and "sent" are not
+# `OrderStatus` values at all, so they matched nothing — and `shipped`, which IS
+# one, appeared in neither set. A shipped order therefore counted as neither
+# revenue nor open and vanished from the dashboard completely. Nothing caught it
+# because dev happened to have no shipped orders.
 
-# Statuses that mean "still in flight" — the ones an operator is watching.
-OPEN_STATUSES = ("pending", "processing", "in_progress", "dispatched", "sent")
+#: Money committed. `shipped` is revenue that has not been confirmed delivered
+#: yet; a `quote` is not an order, and a `cancelled` one is not income —
+#: counting either inflates the total and drags the average ticket.
+REVENUE_STATUSES = (
+    OrderStatus.SHIPPED.value,
+    OrderStatus.DELIVERED.value,
+)
+
+#: Still in flight — what an operator is actively watching. `shipped` is here
+#: too: it has left, but it is not done until it is delivered.
+OPEN_STATUSES = (
+    OrderStatus.PENDING.value,
+    OrderStatus.PROCESSING.value,
+    OrderStatus.SHIPPED.value,
+)
+
+#: Deliberately in neither set, listed so the test can prove the three groups
+#: cover the enum exactly. A quote has not been placed; a cancellation is not
+#: revenue and is not in flight.
+EXCLUDED_STATUSES = (
+    OrderStatus.QUOTE.value,
+    OrderStatus.CANCELLED.value,
+)
 
 # `status` = 1 is the active row in this schema (soft-delete lives in deleted_on).
 ROW_ACTIVE = 1

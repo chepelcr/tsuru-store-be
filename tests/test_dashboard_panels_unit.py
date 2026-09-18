@@ -15,7 +15,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.repositories.dashboard_repository import OPEN_STATUSES, REVENUE_STATUSES
+from app.enums.order_status import OrderStatus
+from app.repositories.dashboard_repository import (
+    EXCLUDED_STATUSES,
+    OPEN_STATUSES,
+    REVENUE_STATUSES,
+)
 from app.services import dashboard_service
 
 
@@ -33,6 +38,40 @@ def _summary(**over):
             "units": 529.0, "last_order_at": None}
     base.update(over)
     return base
+
+
+class TestStatusBuckets:
+    """The guard that the hand-written version of these sets needed and lacked.
+
+    The first implementation spelled the statuses out as literals and invented
+    five that do not exist, while omitting `shipped` — which is real. A shipped
+    order was in neither bucket, so it disappeared from the dashboard, and no
+    test noticed because dev had no shipped orders.
+    """
+
+    def test_every_status_is_classified_exactly_once(self):
+        """A status added to the enum must fail this until someone places it."""
+        revenue, open_, excluded = set(REVENUE_STATUSES), set(OPEN_STATUSES), set(EXCLUDED_STATUSES)
+        all_statuses = {status.value for status in OrderStatus}
+
+        unclassified = all_statuses - (revenue | open_ | excluded)
+        assert not unclassified, f"statuses in no bucket: {sorted(unclassified)}"
+
+        invented = (revenue | open_ | excluded) - all_statuses
+        assert not invented, f"not OrderStatus values: {sorted(invented)}"
+
+        # Excluded is exclusive of the other two; revenue and open deliberately
+        # overlap on `shipped`.
+        assert not excluded & (revenue | open_)
+
+    def test_shipped_counts_as_both(self):
+        """The regression itself: shipped is revenue AND still in flight."""
+        assert OrderStatus.SHIPPED.value in REVENUE_STATUSES
+        assert OrderStatus.SHIPPED.value in OPEN_STATUSES
+
+    def test_quote_and_cancelled_are_neither(self):
+        assert OrderStatus.QUOTE.value not in REVENUE_STATUSES + OPEN_STATUSES
+        assert OrderStatus.CANCELLED.value not in REVENUE_STATUSES + OPEN_STATUSES
 
 
 class TestSalesSummary:
