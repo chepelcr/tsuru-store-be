@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from io import BytesIO
 from typing import Optional
@@ -24,9 +24,10 @@ from app.dtos.requests.product_request_dto import (
 from app.dtos.requests.storefront_order_dto import CreateStorefrontOrderDTO
 from app.dtos.responses.storefront_order_dto import StorefrontOrderCreatedResponse
 from app.enums.hacienda_codes import DiscountType, ProductCodeType, TaxType
+from app.services.order_excel_dates import rewrite_delivery_date
 from app.utils.order_dates import as_date
 from app.utils.product_fiscal_defaults import repair_tax_rows
-from app.enums.order_status import ORDER_STATUS_CODES, can_transition
+from app.enums.order_status import ORDER_STATUS_CODES, OrderStatus, can_transition
 from app.enums.report_color import ReportColorScheme, get_color_palette
 from app.dtos.responses.order_dto import PaginationResponse
 from app.mappers.orders_mapper import build_crossdocking_data, order_to_response
@@ -532,6 +533,99 @@ def update_order_status(organization_id: str, document_number: str, status_code:
         order.order_status = status
         order = repo.save(order)
         return order_to_response(order)
+
+
+def update_order(
+    organization_id: str,
+    document_number: str,
+    status_code: Optional[int] = None,
+    delivery_date: Optional[date] = None,
+) -> OrderResponse:
+    """Change an order's status and/or its delivery date, in one transaction.
+
+    The delivery date is guarded harder than the status, because moving it changes
+    a commitment to the customer rather than recording what happened:
+
+      * **`pending` or `processing` only.** An order still being prepared can
+        legitimately be rescheduled. Once it has SHIPPED the date has been acted
+        on, and once delivered or cancelled it is history; a `quote` is not a
+        placed order yet.
+      * **Not billed.** `invoice_sale_id` present means a fiscal document exists
+        against this order, and its delivery date is on that document.
+      * **Not in the past.** The same rule `_validate_order_dates` applies when a
+        confirmation is built, so the two cannot disagree.
+
+    It also rewrites the order's spreadsheets. That is not an extra: `reprocess_order`
+    re-reads them and `_update_order_from_parsed` assigns `delivery_date` from what it
+    finds, so a database-only change is reverted the next time anyone reprocesses —
+    and Reprocess sits in the order's own menu in the POS.
+    """
+    with OrderRepository() as repo:
+        order = repo.find_by_company_and_document(organization_id, document_number)
+        if not order:
+            raise LookupError(
+                f"Order {document_number} not found for organization {organization_id}"
+            )
+
+        if delivery_date is not None:
+            _assert_delivery_date_editable(order, delivery_date)
+            order.delivery_date = delivery_date
+
+        if status_code is not None:
+            status = _STATUS_BY_CODE.get(status_code)
+            if not status:
+                raise ValueError(
+                    f"Invalid status code: {status_code} "
+                    f"(expected one of {sorted(_STATUS_BY_CODE)})"
+                )
+            if not can_transition(order.order_status, status):
+                raise ValueError(
+                    f"Cannot move order {document_number} from "
+                    f"'{order.order_status}' to '{status}'"
+                )
+            order.order_status = status
+
+        order = repo.save(order)
+
+        # After the commit: the sheets are a copy of what the row now says, and a
+        # failure to rewrite them must not roll back a change the operator made.
+        if delivery_date is not None:
+            rewrite_delivery_date(order, delivery_date)
+
+        return order_to_response(order)
+
+
+#: Statuses in which the delivery date may still be moved.
+#:
+#: An order being prepared can be rescheduled; one that has SHIPPED cannot,
+#: because the date has been acted on and the customer has been told. Delivered
+#: and cancelled are history, and a `quote` is not a placed order.
+DELIVERY_DATE_EDITABLE_STATUSES = (
+    OrderStatus.PENDING.value,
+    OrderStatus.PROCESSING.value,
+)
+
+
+def _assert_delivery_date_editable(order, new_date: date) -> None:
+    """Raise `ValueError` unless this order's delivery date may be moved."""
+    if order.invoice_sale_id:
+        raise ValueError(
+            f"Order {order.document_number} has been billed "
+            f"(document {order.invoice_consecutive_number or order.invoice_sale_id}); "
+            "its delivery date is on that document and cannot be changed here"
+        )
+
+    if order.order_status not in DELIVERY_DATE_EDITABLE_STATUSES:
+        raise ValueError(
+            f"Order {order.document_number} is '{order.order_status}'. The delivery "
+            f"date can only be changed while an order is "
+            f"{' or '.join(repr(s) for s in DELIVERY_DATE_EDITABLE_STATUSES)}"
+        )
+
+    if new_date < date.today():
+        raise ValueError(
+            f"Delivery date {new_date.isoformat()} is in the past"
+        )
 
 
 def _generate_tracking_number() -> str:

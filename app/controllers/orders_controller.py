@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, Optional
 
 from pydantic import ValidationError
@@ -6,7 +7,7 @@ from fastapi import Body, FastAPI, Header, HTTPException, Path, Query
 
 from app.dtos.files import ExcelDTO, ExcelAndColorDTO
 from app.dtos import OrderListResponse, OrderResponse, SelectColorDTO
-from app.dtos.requests.status_request_dto import StatusRequestDTO
+from app.dtos.requests.order_update_dto import OrderUpdateDTO
 from app.dtos.requests.manual_order_dto import CreateManualOrderDTO
 from app.dtos.requests.storefront_order_dto import CreateStorefrontOrderDTO
 from app.dtos.responses.storefront_order_dto import StorefrontOrderCreatedResponse
@@ -17,6 +18,9 @@ from app.dtos.requests.sale_point_request_dto import (
     SalePointUpdateDTO,
 )
 from app.services import order_service, sale_point_service
+
+
+logger = logging.getLogger(__name__)
 
 
 class OrdersController:
@@ -409,16 +413,40 @@ Logical AND and OR conditions can be applied:
             "/api/organizations/{organization_id}/orders/{document_number}",
             response_model=OrderResponse,
             tags=["orders"],
-            summary="Update order status",
+            summary="Update an order's status and/or delivery date",
+            description=(
+                "Both fields are optional; at least one is required, so a "
+                "status-only body keeps working.\n\n"
+                "**Delivery date** may be changed only while the order is "
+                "`pending`, is not yet billed, and the new date is not in the "
+                "past — moving it alters a commitment to the customer rather "
+                "than recording what happened. The order's spreadsheets are "
+                "rewritten to match, because `reprocess` re-reads them and would "
+                "otherwise revert a database-only change.\n\n"
+                "An illegal status transition or a refused date is **400**, not "
+                "500: both are things the caller can correct."
+            ),
         )
-        async def update_order_status(
+        async def update_order(
             organization_id: Annotated[str, Path(description="Organization identifier")],
             document_number: Annotated[str, Path(description="Order document number")],
-            body: StatusRequestDTO = Body(...),
+            body: OrderUpdateDTO = Body(...),
         ):
             try:
-                return order_service.update_order_status(organization_id, document_number, body.status)
+                return order_service.update_order(
+                    organization_id,
+                    document_number,
+                    status_code=body.status,
+                    delivery_date=body.delivery_date,
+                )
             except LookupError as e:
                 raise HTTPException(status_code=404, detail=str(e))
+            except ValueError as e:
+                # An illegal transition, a billed order, a past date. These used
+                # to fall through to the bare `except` below and return 500 for
+                # what is plainly a client error.
+                raise HTTPException(status_code=400, detail=str(e))
             except Exception as e:
+                logger.error(
+                    "Error updating order %s: %s", document_number, e, exc_info=True)
                 raise HTTPException(status_code=500, detail=str(e))

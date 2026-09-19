@@ -3,10 +3,8 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, date
-from io import BytesIO
 from typing import Optional
 
-import openpyxl
 
 from app.dtos.requests.confirmation_request_dto import (
     CreateConfirmationDTO,
@@ -16,7 +14,6 @@ from app.dtos.responses.confirmation_response_dto import (
     ConfirmationListResponse,
     ConfirmationResponse,
 )
-from app.enums.excel_headers import ExcelHeader
 from app.mappers.confirmation_mapper import (
     confirmation_to_response,
     confirmations_to_list_response,
@@ -29,14 +26,12 @@ from app.utils.order_dates import as_date, as_display
 from app.services import order_service
 from app.configuration.app_config import AppConfig
 from app.services.email_service import _extract_provider_number, send_delivery_email
-from app.services.pdf_service import download_from_s3, upload_file_to_s3
+from app.services.order_excel_dates import rewrite_delivery_date
 
 logger = logging.getLogger(__name__)
 
-EXCEL_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 # Column name used in crossdocking Excel files for delivery date
-CROSSDOCKING_DELIVERY_DATE_COL = "FECHA_ENTREGA"
 
 
 def create_confirmation(
@@ -367,11 +362,9 @@ def _link_orders_to_confirmation(
             order.delivery_date = confirmation.delivery_date
 
         if confirmation.delivery_date:
-            # The spreadsheet keeps DD/MM/YYYY — it is what the chain reads
-            # back — so the date is formatted at this boundary rather than stored
-            # that way.
-            _update_detalles_excel_date(order, as_display(confirmation.delivery_date))
-            _update_crossdocking_excel_date(order, as_display(confirmation.delivery_date))
+            # Both sheets, one call — see `order_excel_dates`. The formatting to
+            # DD/MM/YYYY happens in there, at the spreadsheet boundary.
+            rewrite_delivery_date(order, confirmation.delivery_date)
 
         order_repo.save(order)
         _reprocess_order_safe(order.company_id, order.document_number)
@@ -381,8 +374,7 @@ def _link_orders_to_confirmation(
         for order in existing_orders:
             if as_date(order.delivery_date) != earliest_date:
                 order.delivery_date = earliest_date
-                _update_detalles_excel_date(order, as_display(earliest_date))
-                _update_crossdocking_excel_date(order, as_display(earliest_date))
+                rewrite_delivery_date(order, earliest_date)
                 order_repo.save(order)
                 _reprocess_order_safe(order.company_id, order.document_number)
 
@@ -396,89 +388,3 @@ def _reprocess_order_safe(organization_id: str, document_number: str) -> None:
         )
 
 
-def _update_detalles_excel_date(order: Order, new_date) -> None:
-    """Download the DETALLES Excel from S3, update the delivery date column, re-upload."""
-    if not order.excel_url:
-        return
-    try:
-        excel_bytes = download_from_s3(order.excel_url)
-        wb = openpyxl.load_workbook(BytesIO(excel_bytes))
-        ws = wb.active
-
-        # Find the delivery date column using ExcelHeader aliases
-        headers = [str(cell.value or "").strip() for cell in ws[1]]
-        date_col_idx = None
-        for alias in ExcelHeader.DELIVERY_DATE.aliases:
-            if alias in headers:
-                date_col_idx = headers.index(alias)
-                break
-
-        if date_col_idx is None:
-            logger.warning(
-                f"Delivery date column not found in DETALLES Excel for order {order.document_number}"
-            )
-            return
-
-        # Update all data rows (row 2 onwards, 1-indexed in openpyxl)
-        for row_idx in range(2, ws.max_row + 1):
-            ws.cell(row=row_idx, column=date_col_idx + 1, value=new_date)
-
-        buf = BytesIO()
-        wb.save(buf)
-        wb.close()
-
-        # Re-upload to same S3 key
-        _reupload_excel(order.excel_url, buf.getvalue())
-        logger.info(f"Updated DETALLES Excel delivery date for order {order.document_number}")
-    except Exception as e:
-        logger.warning(
-            f"Failed to update DETALLES Excel for order {order.document_number}: {e}"
-        )
-
-
-def _update_crossdocking_excel_date(order: Order, new_date) -> None:
-    """Download the crossdocking Excel from S3, update the FECHA_ENTREGA column, re-upload."""
-    if not order.crossdocking_excel_url:
-        return
-    try:
-        excel_bytes = download_from_s3(order.crossdocking_excel_url)
-        wb = openpyxl.load_workbook(BytesIO(excel_bytes))
-        ws = wb.active
-
-        headers = [str(cell.value or "").strip() for cell in ws[1]]
-        date_col_idx = None
-        if CROSSDOCKING_DELIVERY_DATE_COL in headers:
-            date_col_idx = headers.index(CROSSDOCKING_DELIVERY_DATE_COL)
-
-        if date_col_idx is None:
-            logger.warning(
-                f"FECHA_ENTREGA column not found in crossdocking Excel for order {order.document_number}"
-            )
-            return
-
-        # Update the metadata row (row 2)
-        ws.cell(row=2, column=date_col_idx + 1, value=new_date)
-
-        buf = BytesIO()
-        wb.save(buf)
-        wb.close()
-
-        _reupload_excel(order.crossdocking_excel_url, buf.getvalue())
-        logger.info(
-            f"Updated crossdocking Excel delivery date for order {order.document_number}"
-        )
-    except Exception as e:
-        logger.warning(
-            f"Failed to update crossdocking Excel for order {order.document_number}: {e}"
-        )
-
-
-def _reupload_excel(url: str, file_bytes: bytes) -> None:
-    """Re-upload an Excel file to the same S3 location derived from its URL."""
-    pdf_domain = (AppConfig.get_key("pdf.domain", "") or "").rstrip("/")
-    if pdf_domain and url.startswith(pdf_domain):
-        key = url[len(pdf_domain):].lstrip("/")
-    else:
-        key = url.split(".amazonaws.com/", 1)[-1]
-
-    upload_file_to_s3(file_bytes, key, EXCEL_CONTENT_TYPE)
