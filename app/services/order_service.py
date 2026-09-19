@@ -1594,6 +1594,26 @@ def create_manual_order(
             if client and department.client_id != client.client_id:
                 raise ValueError("Department does not belong to the selected client")
 
+        # ── Chain identifiers, mapped the way the Excel import maps them ──────
+        #
+        # `process_order_excel` UPSERTS both of these from the spreadsheet: the
+        # department's `supplier_code` (the vendor number the chain assigns to us,
+        # `WMNumeroVendedor`) and the store's `gln` (the delivery point,
+        # `WMEnviarGLN`). A manual order picked the same rows from the catalogue,
+        # so it was only ever LOOKING them up — and an order whose department or
+        # store had never been imported carried neither, which is how a document
+        # to the chain went out missing a field it requires.
+        #
+        # Backfill only. If the row already holds a value it stands: the
+        # department and the store are where these are maintained, and a checkout
+        # silently rewriting a catalogue value is how two tills end up
+        # disagreeing about the same delivery point.
+        if department is not None and dto.supplier_code and not department.supplier_code:
+            department.supplier_code = dto.supplier_code.strip() or None
+
+        if store is not None and loc and loc.gln and not store.gln:
+            store.gln = loc.gln.strip() or None
+
         # ── Document number ──────────────────────────────────────────────
         if dto.document_number and dto.document_number.strip():
             document_number = dto.document_number.strip()

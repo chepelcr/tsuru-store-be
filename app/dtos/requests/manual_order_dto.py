@@ -292,6 +292,16 @@ class CreateManualOrderDTO(BaseModel):
     delivery_date: Optional[str] = Field(None, max_length=20)
     delivery_location: Optional[ManualOrderDeliveryLocationDTO] = None
     department_id: Optional[str] = None
+    #: The vendor number the chain assigns to US, held on the department.
+    #:
+    #: Walmart requires it on the document as `WMNumeroVendedor`. The Excel
+    #: import writes it onto the department row it upserts
+    #: (`supplier_code=parsed.supplier_internal_code`); this is the same value
+    #: arriving from a till instead of a spreadsheet, so the order POST can map
+    #: it the same way. It BACKFILLS a department that has none — it never
+    #: overwrites one that does, because the department is where it is
+    #: maintained and a checkout is not the place to redefine it.
+    supplier_code: Optional[str] = Field(None, max_length=50)
 
     #: Taller (work_order) fields — the per-visit facts, not the asset itself.
     asset_id: Optional[str] = None
