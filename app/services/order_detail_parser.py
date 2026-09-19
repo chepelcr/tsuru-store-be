@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import date
 from io import BytesIO
+from typing import Optional
 
 import openpyxl
 
+from app.utils.order_dates import as_date
 from app.enums.excel_headers import ExcelHeader
 from app.exceptions import ExcelParsingException
 from app.dtos.responses.order_dto import (
@@ -36,21 +39,18 @@ def _safe_int(value) -> int:
         return 0
 
 
-def _format_date(value) -> str:
-    if value is None:
-        return ""
-    if hasattr(value, "strftime"):
-        return value.strftime("%d/%m/%Y")
-    s = str(value).strip()
-    # Handle ISO datetime strings like '2026-02-02T04:23:00.0000000'
-    if "T" in s:
-        try:
-            from datetime import datetime
-            dt = datetime.fromisoformat(s[:19])
-            return dt.strftime("%d/%m/%Y")
-        except (ValueError, TypeError):
-            pass
-    return s
+def _format_date(value) -> Optional[date]:
+    """A real `date` from whatever the spreadsheet cell held.
+
+    openpyxl hands back a `datetime` for a cell formatted as a date and a string
+    for one formatted as text, and the sheets contain both. This used to return a
+    `DD/MM/YYYY` STRING, which is how the column came to hold two formats — the
+    import wrote day-first while the POS wrote ISO into the same varchar.
+
+    The name is kept because every call site reads `_format_date(...)`; what it
+    formats now is a date object rather than text.
+    """
+    return as_date(value)
 
 
 def _split_deliver_to(deliver_to: str) -> tuple[str, str]:

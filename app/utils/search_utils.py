@@ -7,6 +7,7 @@ from typing import Any, Optional, Type
 from sqlalchemy import and_, or_, asc, desc
 from sqlalchemy.orm import InstrumentedAttribute
 
+from app.utils.order_dates import as_date
 from app.enums.base_search_filter import BaseSearchFilter
 from app.enums.search_operations import (
     SearchOperations,
@@ -305,6 +306,52 @@ class SearchUtils:
             return ~codes_column.op("@>")(cast([probe], JSONB))
         return None
 
+    @staticmethod
+    def _is_date_column(column) -> bool:
+        """True only for a bare DATE.
+
+        Exact match, not a prefix: SQLAlchemy renders `DateTime` as "DATETIME",
+        which starts with "DATE" — so a prefix test swept timestamp columns in
+        with the date ones and would have coerced `created_on` filters to whole
+        days, silently dropping the time a caller asked to filter on.
+        """
+        return str(getattr(column, "type", "")).strip().upper() == "DATE"
+
+    @staticmethod
+    def _coerce_date_value(value: Any, operation: SearchOperations) -> Any:
+        """A single filter value as a `date`.
+
+        Ranges are NOT handled here — they are still one `a~b` string at this
+        point, and the operator branches below split them. Returning a
+        reformatted string for a range is what produced
+        `operator does not exist: date >= character varying`: the endpoints were
+        bound as text against a date column, which Postgres refuses outright.
+        """
+        if value is None or operation in (
+            SearchOperations.BETWEEN, SearchOperations.NEGATION_BETWEEN
+        ):
+            return value
+        parsed = as_date(value)
+        return parsed if parsed else value
+
+    @classmethod
+    def _range_bounds(cls, column, parts):
+        """The two ends of an `a~b` range, typed for the column.
+
+        For a DATE column both ends become `date` objects, read day-first or ISO
+        by `as_date` — never handed to Postgres as text, which would either be
+        refused (`date >= character varying`) or, worse, cast under this server's
+        MDY DateStyle and silently shift the month.
+        """
+        low, high = parts[0].strip(), parts[1].strip()
+        if not cls._is_date_column(column):
+            return low, high
+        low_date, high_date = as_date(low), as_date(high)
+        # Both or neither: a half-converted range compares a date against text.
+        if low_date and high_date:
+            return low_date, high_date
+        return low, high
+
     @classmethod
     def _apply_operation(cls, column, operation: SearchOperations, value: Any, field_name: Optional[str] = None, search_filter = None):
         # Handle type conversions based on column type
@@ -323,6 +370,19 @@ class SearchUtils:
                 elif isinstance(value, bool):
                     # Convert boolean to integer for backward compatibility
                     value = 1 if value else 2
+
+            # DATE columns — parse the value ourselves rather than letting
+            # Postgres cast it.
+            #
+            # `deliveryDate` and `creationDate` used to be VARCHAR, so a range
+            # was a raw STRING comparison: day-first lexicographic, which put
+            # 02/12/2025 before 03/01/2025 and never matched an ISO-dated manual
+            # order at all. Now the column is a real date, and the remaining trap
+            # is the cast: this server's DateStyle is MDY, so '02/03/2026'::date
+            # is 3 February, not 2 March. `as_date` reads day-first explicitly,
+            # and accepts ISO too, so a client sending either is understood.
+            elif cls._is_date_column(column):
+                value = cls._coerce_date_value(value, operation)
         except Exception:
             pass
 
@@ -367,16 +427,15 @@ class SearchUtils:
             if isinstance(value, str) and BETWEEN_RANGE_SEPARATOR in value:
                 parts = value.split(BETWEEN_RANGE_SEPARATOR)
                 if len(parts) == 2:
-                    min_val = parts[0].strip()
-                    max_val = parts[1].strip()
+                    min_val, max_val = cls._range_bounds(column, parts)
                     return and_(column >= min_val, column <= max_val)
-            return column == value
+            return column == cls._coerce_date_value(value, operation) \
+                if cls._is_date_column(column) else column == value
         elif operation == SearchOperations.NEGATION_BETWEEN:
             if isinstance(value, str) and BETWEEN_RANGE_SEPARATOR in value:
                 parts = value.split(BETWEEN_RANGE_SEPARATOR)
                 if len(parts) == 2:
-                    min_val = parts[0].strip()
-                    max_val = parts[1].strip()
+                    min_val, max_val = cls._range_bounds(column, parts)
                     return or_(column < min_val, column > max_val)
             return column != value
         else:

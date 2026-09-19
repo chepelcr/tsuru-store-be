@@ -25,6 +25,7 @@ from app.models.confirmation import Confirmation
 from app.models.order import Order
 from app.repositories.confirmation_repository import ConfirmationRepository
 from app.repositories.order_repository import OrderRepository
+from app.utils.order_dates import as_date, as_display
 from app.services import order_service
 from app.configuration.app_config import AppConfig
 from app.services.email_service import _extract_provider_number, send_delivery_email
@@ -171,7 +172,8 @@ def update_confirmation_status(
 
 def _send_confirmation_email(confirmation: Confirmation, orders: list[Order]) -> None:
     """Collect NuevoReporte Excel attachments and send delivery email."""
-    delivery_date = confirmation.delivery_date or ""
+    # The email prints it, so format here — the column is a real date.
+    delivery_date = as_display(confirmation.delivery_date)
 
     # Extract provider number from the organization's internal_code
     provider_number = ""
@@ -242,9 +244,16 @@ def remove_order_from_confirmation(
 # ---------------------------------------------------------------------------
 
 
-def _parse_date(date_str: str) -> date:
-    """Parse a date string in dd/mm/yyyy format."""
-    return datetime.strptime(date_str.strip(), "%d/%m/%Y").date()
+def _parse_date(value) -> Optional[date]:
+    """Coerce an order date, whatever shape it is in.
+
+    Was `strptime(..., "%d/%m/%Y")`, which HARD-FAILED on the ISO dates the POS
+    and the storefront write — so linking a manual order to a confirmation raised
+    "invalid delivery date format" about a perfectly valid date. It now goes
+    through the one helper that knows all the shapes, including the real `date`
+    the column returns after migration d3e4f5a6b7c8.
+    """
+    return as_date(value)
 
 
 def _validate_deliver_to(
@@ -276,14 +285,16 @@ def _validate_deliver_to(
     return result_store_id
 
 
-def _validate_order_dates(new_orders: list[Order], existing_orders: list[Order]) -> str:
+def _validate_order_dates(
+    new_orders: list[Order], existing_orders: list[Order]
+) -> Optional[date]:
     """Validate date rules and return the earliest delivery date.
 
     Rules:
       1. No order can have a delivery date in the past.
       2. All orders (new + existing) must be in the same month/year.
 
-    Returns the earliest delivery date string (dd/mm/yyyy) across all orders.
+    Returns the earliest delivery date across all orders, as a `date`.
     """
     today = date.today()
     all_dates: list[date] = []
@@ -292,11 +303,11 @@ def _validate_order_dates(new_orders: list[Order], existing_orders: list[Order])
     for order in all_orders:
         if not order.delivery_date:
             continue
-        try:
-            d = _parse_date(order.delivery_date)
-        except ValueError:
+        d = _parse_date(order.delivery_date)
+        if d is None:
             raise ValueError(
-                f"Order '{order.document_number}' has an invalid delivery date format: '{order.delivery_date}'. Expected dd/mm/yyyy."
+                f"Order '{order.document_number}' has an unreadable delivery date: "
+                f"'{order.delivery_date}'"
             )
         if d < today:
             raise ValueError(
@@ -305,7 +316,7 @@ def _validate_order_dates(new_orders: list[Order], existing_orders: list[Order])
         all_dates.append(d)
 
     if not all_dates:
-        return ""
+        return None
 
     # Check all dates share the same month/year
     ref_month = all_dates[0].month
@@ -317,8 +328,9 @@ def _validate_order_dates(new_orders: list[Order], existing_orders: list[Order])
                 f"Found dates in {all_dates[0].strftime('%m/%Y')} and {d.strftime('%m/%Y')}"
             )
 
-    earliest = min(all_dates)
-    return earliest.strftime("%d/%m/%Y")
+    # A `date`, not a formatted string: the column it is written to is a date
+    # now, and formatting belongs at the point of display.
+    return min(all_dates)
 
 
 def _link_orders_to_confirmation(
@@ -355,8 +367,11 @@ def _link_orders_to_confirmation(
             order.delivery_date = confirmation.delivery_date
 
         if confirmation.delivery_date:
-            _update_detalles_excel_date(order, confirmation.delivery_date)
-            _update_crossdocking_excel_date(order, confirmation.delivery_date)
+            # The spreadsheet keeps DD/MM/YYYY — it is what the chain reads
+            # back — so the date is formatted at this boundary rather than stored
+            # that way.
+            _update_detalles_excel_date(order, as_display(confirmation.delivery_date))
+            _update_crossdocking_excel_date(order, as_display(confirmation.delivery_date))
 
         order_repo.save(order)
         _reprocess_order_safe(order.company_id, order.document_number)
@@ -364,10 +379,10 @@ def _link_orders_to_confirmation(
     # Also update existing orders if the earliest date changed
     if earliest_date and existing_orders:
         for order in existing_orders:
-            if order.delivery_date != earliest_date:
+            if as_date(order.delivery_date) != earliest_date:
                 order.delivery_date = earliest_date
-                _update_detalles_excel_date(order, earliest_date)
-                _update_crossdocking_excel_date(order, earliest_date)
+                _update_detalles_excel_date(order, as_display(earliest_date))
+                _update_crossdocking_excel_date(order, as_display(earliest_date))
                 order_repo.save(order)
                 _reprocess_order_safe(order.company_id, order.document_number)
 
@@ -381,7 +396,7 @@ def _reprocess_order_safe(organization_id: str, document_number: str) -> None:
         )
 
 
-def _update_detalles_excel_date(order: Order, new_date: str) -> None:
+def _update_detalles_excel_date(order: Order, new_date) -> None:
     """Download the DETALLES Excel from S3, update the delivery date column, re-upload."""
     if not order.excel_url:
         return
@@ -421,7 +436,7 @@ def _update_detalles_excel_date(order: Order, new_date: str) -> None:
         )
 
 
-def _update_crossdocking_excel_date(order: Order, new_date: str) -> None:
+def _update_crossdocking_excel_date(order: Order, new_date) -> None:
     """Download the crossdocking Excel from S3, update the FECHA_ENTREGA column, re-upload."""
     if not order.crossdocking_excel_url:
         return

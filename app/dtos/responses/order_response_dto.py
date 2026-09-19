@@ -2,6 +2,8 @@
 """Order DTO - Main order information."""
 
 from typing import Optional
+from datetime import date
+
 from pydantic import BaseModel, Field, ConfigDict
 
 from .crossdocking_data_dto import CrossDockingDataDTO
@@ -83,16 +85,19 @@ class OrderResponse(BaseModel):
         examples=["Standard", "Crossdocking", "Direct"]
     )
     
-    creation_date: Optional[str] = Field(
+    # ISO on the wire, always. These were VARCHAR columns holding both
+    # DD/MM/YYYY and YYYY-MM-DD, so a client had to sniff which it got; now the
+    # column is a real date and `date` serialises as ISO, so there is one shape.
+    creation_date: Optional[date] = Field(
         None,
-        description="Order creation date",
-        examples=["2024-01-15", "2024-03-20"]
+        description="Order creation date (ISO `YYYY-MM-DD`)",
+        examples=["2026-01-15"]
     )
-    
-    delivery_date: Optional[str] = Field(
+
+    delivery_date: Optional[date] = Field(
         None,
-        description="Expected delivery date",
-        examples=["2024-01-20", "2024-03-25"]
+        description="Expected delivery date (ISO `YYYY-MM-DD`)",
+        examples=["2026-01-20"]
     )
     
     order_status: Optional[str] = Field(

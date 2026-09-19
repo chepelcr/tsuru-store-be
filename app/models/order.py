@@ -3,7 +3,9 @@ from __future__ import annotations
 import uuid
 from typing import List, Optional
 
-from sqlalchemy import BigInteger, ForeignKey, Index, Integer, Numeric, String, text
+from datetime import date
+
+from sqlalchemy import BigInteger, Date, ForeignKey, Index, Integer, Numeric, String, text
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,8 +20,12 @@ class Order(Base, AuditMixin):
         String(50), ForeignKey("organizations.id"), nullable=False
     )
     document_number: Mapped[str] = mapped_column(String(50), nullable=False)
-    creation_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    delivery_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Real dates since migration d3e4f5a6b7c8. They were VARCHAR(20) holding TWO
+    # formats — DD/MM/YYYY from the Excel import, YYYY-MM-DD from the POS — which
+    # made every range filter a lexicographic string compare and every read a
+    # guess. Anything touching them goes through `app.utils.order_dates`.
+    creation_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     order_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="pending")
     subtotal: Mapped[Optional[float]] = mapped_column(Numeric(18, 5), nullable=True, default=0)
     discounts: Mapped[Optional[float]] = mapped_column(Numeric(18, 5), nullable=True, default=0)

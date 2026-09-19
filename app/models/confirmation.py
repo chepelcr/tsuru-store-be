@@ -3,7 +3,9 @@ from __future__ import annotations
 import uuid
 from typing import List, Optional
 
-from sqlalchemy import BigInteger, ForeignKey, Index, String
+from datetime import date
+
+from sqlalchemy import Date, BigInteger, ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,7 +18,7 @@ class Confirmation(Base, AuditMixin):
     confirmation_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     company_id: Mapped[str] = mapped_column(String(50), nullable=False)
     confirmation_number: Mapped[str] = mapped_column(String(100), nullable=False)
-    delivery_date: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     confirmation_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="processing")
 
     # Normalized FK

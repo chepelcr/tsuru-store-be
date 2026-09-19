@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from app.utils.order_dates import as_display
 from app.configuration.app_config import AppConfig
 from app.models.order import Order
 from app.services.pdf_service import (
@@ -162,7 +163,7 @@ def build_order_ticket_context(order: Order, **overrides: Any) -> Dict[str, Any]
         "payments": payments,
         # Only meaningful when the customer actually overpaid in cash.
         "change": max(0.0, paid - grand_total) if payments else 0.0,
-        "delivery_date": order.delivery_date,
+        "delivery_date": as_display(order.delivery_date),
         "delivery_location": delivery_location,
         "department": order.department_rel.name if order.department_rel else None,
         "comment": order.comment,

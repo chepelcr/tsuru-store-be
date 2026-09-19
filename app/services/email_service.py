@@ -111,7 +111,9 @@ def send_delivery_email(
     """Send delivery notification email with Excel report attachments.
 
     Args:
-        delivery_date: Formatted delivery date string (dd/mm/yyyy).
+        delivery_date: Formatted delivery date string (dd/mm/yyyy). Already
+            formatted by the caller via `order_dates.as_display` — this function
+            interpolates it into copy and does not parse it.
         provider_number: Provider number extracted from supplier code.
         attachment_urls: List of dicts with 'url' and 'filename' keys for Excel attachments.
 

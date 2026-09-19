@@ -7,6 +7,7 @@ import boto3
 import pdfkit
 from jinja2 import Environment, FileSystemLoader
 
+from app.utils.order_dates import as_display
 from app.configuration.app_config import AppConfig
 from app.enums.report_color import get_color_palette
 from app.models.order import Order
@@ -91,7 +92,8 @@ def render_order_html(order: Order) -> str:
         "supplier_logo_url": supplier_logo_url,
         "document_number": order.document_number or "",
         "creation_date_formatted": order.creation_date or "",
-        "delivery_date_formatted": order.delivery_date or "",
+        # Formatted here, at the point of display: the column is a real date now.
+        "delivery_date_formatted": as_display(order.delivery_date),
         "client_name": client_name,
         "client_gln": client_gln,
         "deliver_to": deliver_to,

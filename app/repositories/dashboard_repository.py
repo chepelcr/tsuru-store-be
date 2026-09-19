@@ -321,12 +321,11 @@ class DashboardRepository(DatabaseConnection):
         finished business; it should not still be inflating today's session
         figure.
 
-        ⚠️ `delivery_date` is a VARCHAR holding two different formats
-        ("DD/MM/YYYY" from an Excel import, "YYYY-MM-DD" from a manual order), so
-        "delivered today" cannot be asked of it safely yet — a cast reads the
-        wrong month for any day <= 12. Until that column becomes a real date, a
-        delivered order counts when it was CREATED today, and the response says
-        which rule it used so the UI cannot imply the other one.
+        Since migration `d3e4f5a6b7c8` this asks the real question. `delivery_date`
+        was a VARCHAR holding two formats, so it could not be compared to today
+        without misreading the month on any day <= 12 — the figure fell back to
+        "created today" and said so. It is a `date` now, so the comparison is the
+        one the rule actually describes.
         """
         join, where, scope_params = _scope_sql(scope)
         query = text(f"""
@@ -339,7 +338,7 @@ class DashboardRepository(DatabaseConnection):
               AND o.deleted_on IS NULL
               AND (
                     o.order_status = ANY(:open_statuses)
-                 OR (o.order_status = :delivered AND o.created_on >= CURRENT_DATE)
+                 OR (o.order_status = :delivered AND o.delivery_date = CURRENT_DATE)
               )
               {where}
         """)
@@ -355,8 +354,8 @@ class DashboardRepository(DatabaseConnection):
             "orders": orders,
             "revenue": revenue,
             "average_ticket": (revenue / orders) if orders else 0.0,
-            # Honest about the approximation above.
-            "delivered_rule": "created_today",
+            # No longer an approximation: the column is a real date.
+            "delivered_rule": "delivery_date_today",
         }
 
     # ── Live tills ──────────────────────────────────────────────────────────

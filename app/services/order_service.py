@@ -24,6 +24,7 @@ from app.dtos.requests.product_request_dto import (
 from app.dtos.requests.storefront_order_dto import CreateStorefrontOrderDTO
 from app.dtos.responses.storefront_order_dto import StorefrontOrderCreatedResponse
 from app.enums.hacienda_codes import DiscountType, ProductCodeType, TaxType
+from app.utils.order_dates import as_date
 from app.utils.product_fiscal_defaults import repair_tax_rows
 from app.enums.order_status import ORDER_STATUS_CODES, can_transition
 from app.enums.report_color import ReportColorScheme, get_color_palette
@@ -1636,7 +1637,7 @@ def create_manual_order(
             order_type=order_type,
             order_status=_QUOTE_STATUS if dto.is_quote else _PENDING_STATUS,
             creation_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            delivery_date=dto.delivery_date,
+            delivery_date=as_date(dto.delivery_date),
             created_by=created_by,
             idempotency_key=idempotency_key,
             client_id=client.client_id if client else None,

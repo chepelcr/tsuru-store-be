@@ -322,13 +322,15 @@ class TestSessionSales:
     def test_reports_the_rule_it_used(self, repo):
         repo.session_sales.return_value = {
             "orders": 4, "revenue": 373069.5,
-            "average_ticket": 93267.375, "delivered_rule": "created_today",
+            "average_ticket": 93267.375, "delivered_rule": "delivery_date_today",
         }
         result = dashboard_service.get_session_sales("org-1", "admin-1")
         assert result.orders == 4
-        # Stated, not implied: `delivery_date` is still a two-format string that
-        # cannot be compared, so "delivered today" is approximated by creation.
-        assert result.delivered_rule == "created_today"
+        # The real rule now that `delivery_date` is a date column (migration
+        # d3e4f5a6b7c8). It read `created_today` while the column was a
+        # two-format string that could not be compared to today without
+        # misreading the month.
+        assert result.delivered_rule == "delivery_date_today"
 
 
 class TestStations:

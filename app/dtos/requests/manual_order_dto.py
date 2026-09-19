@@ -289,6 +289,9 @@ class CreateManualOrderDTO(BaseModel):
     activity_code: Optional[str] = Field(None, max_length=20)
     credit_term: Optional[str] = Field(None, max_length=10)
 
+    #: ISO `YYYY-MM-DD` from the POS. Kept as a string on the way in so a client
+    #: still sending `DD/MM/YYYY` is not rejected at the edge — the service
+    #: coerces it through `order_dates.as_date`, which reads both.
     delivery_date: Optional[str] = Field(None, max_length=20)
     delivery_location: Optional[ManualOrderDeliveryLocationDTO] = None
     department_id: Optional[str] = None
