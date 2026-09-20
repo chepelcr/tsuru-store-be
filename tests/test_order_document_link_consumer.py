@@ -14,7 +14,7 @@ import pytest
 
 from app.dtos.requests.order_document_link_dto import OrderDocumentLinkEvent
 from app.handlers.sqs_handler import SqsHandler
-from app.services.order_service import link_order_document
+from app.services.order_service import is_order_billed, link_order_document
 
 #: The producer's committed wire shape, byte-identical to sales-be's copy at
 #: `shared/tests/fixtures/link_order_document_event.json`. Both repos assert
@@ -204,6 +204,56 @@ class TestLinking:
 
         assert link_order_document("org-1", "PM-000123", DOCUMENT) is not None
         assert existing.document_id == DOCUMENT["document_id"]
+
+    @patch("app.services.order_service.order_to_response", lambda o: o)
+    def test_a_rejection_releases_the_order(self, repo):
+        """Hacienda refused it, so nothing was billed and the cashier must be
+        able to issue a corrected document."""
+        existing = order(document_id=DOCUMENT["document_id"], document_info={"status": 0})
+        repo.find_by_company_and_document.return_value = existing
+        repo.save.side_effect = lambda o: o
+
+        link_order_document("org-1", "PM-000123", {**DOCUMENT, "status": 3})
+
+        assert existing.document_info["status"] == 3
+        # The link is KEPT — the order records which document was refused — but
+        # it stops counting as billed.
+        assert existing.document_id == DOCUMENT["document_id"]
+        assert is_order_billed(existing) is False
+
+    @patch("app.services.order_service.order_to_response", lambda o: o)
+    def test_a_corrected_document_may_claim_a_released_order(self, repo):
+        """The whole point of releasing it. Without this the emission claim
+        stands forever and the order is stuck, repairable only by hand."""
+        existing = order(
+            document_id="refused-doc",
+            document_info={"status": 3, "consecutive_number": "…238"},
+        )
+        repo.find_by_company_and_document.return_value = existing
+        repo.save.side_effect = lambda o: o
+
+        assert link_order_document("org-1", "PM-000123", DOCUMENT) is not None
+        assert existing.document_id == DOCUMENT["document_id"]
+        assert is_order_billed(existing) is True
+
+    def test_an_accepted_document_still_cannot_be_displaced(self, repo):
+        """Releasing on rejection must not weaken the double-billing guard."""
+        repo.find_by_company_and_document.return_value = order(
+            document_id="accepted-doc", document_info={"status": 1},
+        )
+
+        assert link_order_document("org-1", "PM-000123", DOCUMENT) is None
+        repo.save.assert_not_called()
+
+    def test_an_in_flight_document_cannot_be_displaced_either(self, repo):
+        """A claim with no verdict yet still holds the order — that is what
+        stops the second factura while the first is being validated."""
+        repo.find_by_company_and_document.return_value = order(
+            document_id="in-flight-doc", document_info={"status": 0},
+        )
+
+        assert link_order_document("org-1", "PM-000123", DOCUMENT) is None
+        repo.save.assert_not_called()
 
     def test_a_document_with_no_id_is_a_real_error(self, repo):
         with pytest.raises(ValueError, match="document_id"):

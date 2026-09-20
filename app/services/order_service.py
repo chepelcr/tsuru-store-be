@@ -608,7 +608,7 @@ DELIVERY_DATE_EDITABLE_STATUSES = (
 
 def _assert_delivery_date_editable(order, new_date: date) -> None:
     """Raise `ValueError` unless this order's delivery date may be moved."""
-    if order.document_id:
+    if is_order_billed(order):
         consecutive = (order.document_info or {}).get("consecutive_number")
         raise ValueError(
             f"Order {order.document_number} has been billed "
@@ -1890,6 +1890,29 @@ def find_order(organization_id: str, document_number: str):
         return repo.find_by_company_and_document(organization_id, document_number)
 
 
+#: Hacienda verdict that means the order was NOT billed after all.
+#:
+#: The link is kept rather than cleared, so the order records the attempt and
+#: the operator can see which document was refused; what changes is that it no
+#: longer counts as billed.
+REJECTED_STATUS = 3
+
+
+def _is_released(document_info: Optional[dict]) -> bool:
+    """Was this order's document refused, leaving the order billable again?"""
+    return (document_info or {}).get("status") == REJECTED_STATUS
+
+
+def is_order_billed(order) -> bool:
+    """Does a document hold this order?
+
+    True from EMISSION — sales-api claims the order when the document is
+    submitted, which is what stops a second factura while the first is in
+    flight — and false again if Hacienda rejects it.
+    """
+    return bool(order.document_id) and not _is_released(order.document_info)
+
+
 def link_order_document(
     organization_id: str,
     document_number: str,
@@ -1928,9 +1951,11 @@ def link_order_document(
 
     A redelivered message is safe: the write is idempotent for a given document.
 
-    Note what this means for a REJECTED document — the claim from step 1 stays,
-    so the order remains unbillable. Releasing it is a deliberate act through
-    the repair endpoint, not something a verdict does on its own.
+    A REJECTED verdict arrives here too, and RELEASES the order: Hacienda
+    refused the document, so nothing was legally billed and a corrected one has
+    to be issuable. The link is kept rather than cleared — the order records
+    which document was refused — but it stops counting as billed, and the next
+    document may claim it.
     """
     document_id = (document or {}).get("document_id")
     if not document_id:
@@ -1947,13 +1972,23 @@ def link_order_document(
             return None
 
         if order.document_id and order.document_id != document_id:
-            existing = (order.document_info or {}).get("consecutive_number")
-            logger.error(
-                "LINK_ORDER_DOCUMENT: order '%s' is already billed by %s; refusing to "
-                "relink it to %s.",
-                document_number, existing or order.document_id, document_id,
+            # A different document already holds this order — unless that one
+            # was REJECTED, in which case it holds nothing: Hacienda refused it,
+            # so the order was never billed and the corrected document that
+            # replaces it is entitled to claim it.
+            if not _is_released(order.document_info):
+                existing = (order.document_info or {}).get("consecutive_number")
+                logger.error(
+                    "LINK_ORDER_DOCUMENT: order '%s' is already billed by %s; refusing "
+                    "to relink it to %s.",
+                    document_number, existing or order.document_id, document_id,
+                )
+                return None
+            logger.info(
+                "LINK_ORDER_DOCUMENT: order '%s' was released by the rejection of %s; "
+                "claiming it for %s.",
+                document_number, order.document_id, document_id,
             )
-            return None
 
         order.document_id = document_id
         order.document_info = {
