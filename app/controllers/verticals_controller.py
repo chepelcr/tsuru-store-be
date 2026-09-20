@@ -108,6 +108,7 @@ class VerticalsController:
         # ── Farmacia: lots ───────────────────────────────────────────────
         @app.get(
             f"{org}/products/{{product_id}}/lots",
+            response_model=LotListResponse,
             tags=["verticals"],
             summary="Sellable lots for a product, in FEFO order",
             description="""**First Expiry, First Out** — not FIFO. For anything with a shelf life
@@ -141,6 +142,7 @@ should default to. `expires_in_days` is present only inside the warning window;
         # ── Taller: client assets ────────────────────────────────────────
         @app.get(
             f"{org}/clients/{{client_id}}/assets",
+            response_model=AssetListResponse,
             tags=["verticals"],
             summary="A client's assets (vehicle / equipment)",
             description="""Scoped to the client, exactly like departments and stores — which is
@@ -168,6 +170,7 @@ only exists if the asset outlives the visit.""",
         @app.post(
             f"{org}/clients/{{client_id}}/assets",
             status_code=201,
+            response_model=AssetResponse,
             tags=["verticals"],
             summary="Register an asset for a client",
             description="`identifier` (placa/serie) is unique per client — the same plate twice is a data-entry mistake, and the history view depends on it being one row.",
@@ -206,6 +209,7 @@ only exists if the asset outlives the visit.""",
         # ── Agenda: appointments (salón AND taller) ──────────────────────
         @app.get(
             f"{org}/appointments",
+            response_model=AppointmentListResponse,
             tags=["verticals"],
             summary="Appointments in a date range",
             description="""One calendar, two verticals: a salón books a person, a taller books a
@@ -225,6 +229,7 @@ work-order tab when the asset is set.""",
         @app.post(
             f"{org}/appointments",
             status_code=201,
+            response_model=AppointmentResponse,
             tags=["verticals"],
             summary="Book an appointment",
         )
@@ -251,6 +256,7 @@ work-order tab when the asset is set.""",
 
         @app.patch(
             f"{org}/appointments/{{appointment_id}}",
+            response_model=AppointmentResponse,
             tags=["verticals"],
             summary="Reschedule, reassign, or complete an appointment",
         )
@@ -275,6 +281,28 @@ work-order tab when the asset is set.""",
 
                 repo.session.flush()
                 return _map_appointment(appt)
+
+
+# ─── List envelopes ─────────────────────────────────────────────────────────
+#
+# The three list routes already returned `{"data": [...]}` — these name that shape
+# so the routes can declare a `response_model`. Without one, the only description
+# of these six endpoints was the code that happened to build them, and the
+# generated API Gateway had nothing to publish.
+
+
+class LotListResponse(BaseModel):
+    """Sellable lots, already in FEFO order — first entry is the till's default."""
+
+    data: List[LotResponse]
+
+
+class AssetListResponse(BaseModel):
+    data: List[AssetResponse]
+
+
+class AppointmentListResponse(BaseModel):
+    data: List[AppointmentResponse]
 
 
 def _map_appointment(a: Appointment) -> AppointmentResponse:

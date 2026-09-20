@@ -56,6 +56,17 @@ discounts, a client, a delivery target and optional payments.
 the order id plus a public **tracking number** to hand off to WhatsApp.
 """,
         )
+        # DELIBERATELY no `response_model`. This route answers with one of two
+        # genuinely different shapes — `OrderResponse` for a manual order,
+        # `StorefrontOrderCreatedResponse` (id + public tracking number + status)
+        # for an anonymous storefront pedido — discriminated by hand so the
+        # storefront body, which predates `source`, keeps validating as before.
+        #
+        # A single model would strip the other's fields, and a `Union` is worse:
+        # Pydantic would try `OrderResponse` first and, if it validates loosely,
+        # silently drop the tracking number the customer needs to follow the order.
+        # Documented here rather than papered over with a model that is wrong half
+        # the time.
         async def create_order(
             organization_id: Annotated[str, Path(description="Organization identifier")],
             body: dict = Body(...),

@@ -100,6 +100,18 @@ def create_closing(
 
         # Calculate expected amounts from orders
         expected_amounts = repo.calculate_expected_amounts(dto.assignment_id)
+        if not expected_amounts.available:
+            # Recorded on the closing itself, because `cash_difference` is a
+            # GENERATED column (`declared - expected`): with an unavailable
+            # expectation every difference equals the declared amount, which reads
+            # as a surplus. Whoever reviews this closing has to be able to see
+            # that the expectation was never measured.
+            logger.warning(
+                "Closing for assignment %s is being created with UNAVAILABLE "
+                "expected amounts; its difference columns will equal the declared "
+                "amounts and must not be read as a surplus.",
+                dto.assignment_id,
+            )
 
         # Calculate declared total
         declared_total = dto.declared_cash + dto.declared_sinpe + dto.declared_card
@@ -115,10 +127,10 @@ def create_closing(
             terminal_id=assignment.terminal_id,
             cashier_id=assignment.user_id,
             # Expected amounts (from system)
-            expected_cash=expected_amounts['expected_cash'],
-            expected_sinpe=expected_amounts['expected_sinpe'],
-            expected_card=expected_amounts['expected_card'],
-            expected_total=expected_amounts['expected_total'],
+            expected_cash=expected_amounts.expected_cash,
+            expected_sinpe=expected_amounts.expected_sinpe,
+            expected_card=expected_amounts.expected_card,
+            expected_total=expected_amounts.expected_total,
             # Declared amounts (from cashier)
             declared_cash=dto.declared_cash,
             declared_sinpe=dto.declared_sinpe,

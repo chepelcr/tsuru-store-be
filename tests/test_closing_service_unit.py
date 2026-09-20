@@ -16,6 +16,7 @@ from app.dtos.requests.closing_request_dto import (
     ClosingUpdateRequestDTO,
 )
 from app.models.closing import Closing
+from app.repositories.closing_repository import ExpectedAmounts
 
 
 class TestClosingServiceUnit:
@@ -325,12 +326,12 @@ class TestClosingServiceUnit:
         assignment_details.user_id = "cashier-1"
         mock_repo.get_assignment_details.return_value = assignment_details
         
-        mock_repo.calculate_expected_amounts.return_value = {
-            'expected_cash': Decimal('0'),
-            'expected_sinpe': Decimal('0'),
-            'expected_card': Decimal('0'),
-            'expected_total': Decimal('0'),
-        }
+        mock_repo.calculate_expected_amounts.return_value = ExpectedAmounts(
+            expected_cash=Decimal('0'),
+            expected_sinpe=Decimal('0'),
+            expected_card=Decimal('0'),
+            expected_total=Decimal('0'),
+        )
         
         saved_closing = None
         def capture_closing(closing):
@@ -378,12 +379,12 @@ class TestClosingServiceUnit:
         assignment_details.user_id = "cashier-1"
         mock_repo.get_assignment_details.return_value = assignment_details
         
-        mock_repo.calculate_expected_amounts.return_value = {
-            'expected_cash': Decimal('0'),
-            'expected_sinpe': Decimal('0'),
-            'expected_card': Decimal('0'),
-            'expected_total': Decimal('0'),
-        }
+        mock_repo.calculate_expected_amounts.return_value = ExpectedAmounts(
+            expected_cash=Decimal('0'),
+            expected_sinpe=Decimal('0'),
+            expected_card=Decimal('0'),
+            expected_total=Decimal('0'),
+        )
         
         saved_closing = None
         def capture_closing(closing):
@@ -432,12 +433,12 @@ class TestClosingServiceUnit:
         mock_repo.get_assignment_details.return_value = assignment_details
         
         # Mock expected amounts from orders
-        mock_repo.calculate_expected_amounts.return_value = {
-            'expected_cash': Decimal('150.00'),
-            'expected_sinpe': Decimal('100.00'),
-            'expected_card': Decimal('75.00'),
-            'expected_total': Decimal('325.00'),
-        }
+        mock_repo.calculate_expected_amounts.return_value = ExpectedAmounts(
+            expected_cash=Decimal('150.00'),
+            expected_sinpe=Decimal('100.00'),
+            expected_card=Decimal('75.00'),
+            expected_total=Decimal('325.00'),
+        )
         
         saved_closing = None
         def capture_closing(closing):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 import uuid
 from decimal import Decimal
@@ -12,6 +13,43 @@ from app.configuration.database_connection import DatabaseConnection
 from app.models.closing import Closing
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ExpectedAmounts:
+    """What the system expected a till to hold, per payment method.
+
+    **`available` is the important field.** These figures come from a
+    `sales_orders` table that DOES NOT EXIST — `to_regclass('sales_orders')` is
+    null in dev — so the query has always fallen into its own except branch and
+    returned zeros. The docstring said so ("this is expected if sales_orders table
+    doesn't exist yet") and nothing downstream could tell that apart from a till
+    that genuinely expected nothing.
+
+    That distinction is not cosmetic. `closings.cash_difference` is a GENERATED
+    column, `declared_cash - expected_cash`, so a zero expectation reports the
+    cashier's entire declared cash as a SURPLUS — on every closing, for ever. An
+    unavailable expectation and a real zero must therefore be different values in
+    the type, so a caller cannot use one as the other by accident.
+
+    No closing exists yet in dev (0 rows), so nothing has been mis-reconciled.
+    Computing this properly needs the payment split, which lives on documents in
+    sales-be, not in any table this service owns — recorded on the roadmap rather
+    than guessed at here.
+    """
+
+    expected_cash: Decimal
+    expected_sinpe: Decimal
+    expected_card: Decimal
+    expected_total: Decimal
+    #: False when the source could not be read at all — the amounts are then
+    #: placeholders, not measurements.
+    available: bool = True
+
+    @classmethod
+    def unavailable(cls) -> "ExpectedAmounts":
+        zero = Decimal("0")
+        return cls(zero, zero, zero, zero, available=False)
 
 
 class ClosingRepository(DatabaseConnection):
@@ -176,7 +214,7 @@ class ClosingRepository(DatabaseConnection):
             )
             raise
 
-    def calculate_expected_amounts(self, assignment_id: str) -> dict:
+    def calculate_expected_amounts(self, assignment_id: str) -> ExpectedAmounts:
         """Calculate expected amounts from orders for an assignment.
 
         NOTE: This assumes a sales_orders table exists with columns:
@@ -203,21 +241,24 @@ class ClosingRepository(DatabaseConnection):
 
             result = self.session.execute(query, {"assignment_id": str(assignment_id)}).one()
 
-            return {
-                'expected_cash': Decimal(str(result.cash)),
-                'expected_sinpe': Decimal(str(result.sinpe)),
-                'expected_card': Decimal(str(result.card)),
-                'expected_total': Decimal(str(result.total)),
-            }
-        except Exception as e:
-            # If the table doesn't exist or there's an error, log it and return zeros
-            logger.warning(
-                f"Could not calculate expected amounts for assignment {assignment_id}: {e}. "
-                f"Returning zeros. This is expected if sales_orders table doesn't exist yet."
+            return ExpectedAmounts(
+                expected_cash=Decimal(str(result.cash)),
+                expected_sinpe=Decimal(str(result.sinpe)),
+                expected_card=Decimal(str(result.card)),
+                expected_total=Decimal(str(result.total)),
             )
-            return {
-                'expected_cash': Decimal('0'),
-                'expected_sinpe': Decimal('0'),
-                'expected_card': Decimal('0'),
-                'expected_total': Decimal('0'),
-            }
+        except Exception as e:
+            # Not "expected", and not zeros: UNAVAILABLE. `sales_orders` does not
+            # exist, so this branch is the only one that has ever run, and the
+            # zeros it returns become a full-declared-amount surplus through the
+            # generated difference columns. The flag is what lets a caller tell
+            # the two apart; the log says which source is missing.
+            logger.warning(
+                "Expected amounts UNAVAILABLE for assignment %s: %s. The payment "
+                "split has no source in this service — it lives on documents in "
+                "sales-be — so the returned zeros are placeholders, not a "
+                "measurement, and every difference computed from them is the "
+                "declared amount itself.",
+                assignment_id, e,
+            )
+            return ExpectedAmounts.unavailable()

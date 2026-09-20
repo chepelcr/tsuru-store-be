@@ -7,7 +7,11 @@ from fastapi import Body, FastAPI, HTTPException, Path, Query
 from app.dtos.files import ExcelDTO
 from app.dtos.requests.status_request_dto import StatusRequestDTO
 from app.dtos.requests.store_request_dto import StoreRequestDTO
-from app.dtos.responses.store_dto import StoreListResponse, StoreResponse
+from app.dtos.responses.store_dto import (
+    StoreListResponse,
+    StoreResponse,
+    StoreUploadResponse,
+)
 from app.services import store_service
 
 
@@ -87,6 +91,7 @@ class StoresController:
 
         @app.post(
             "/api/organizations/{organization_id}/clients/{client_id}/stores/upload",
+            response_model=StoreUploadResponse,
             tags=["stores"],
             summary="Upload stores from an Excel file",
             description="Upload an Excel file with columns: Codigo, Nombre, SLOT ID, Cadena",

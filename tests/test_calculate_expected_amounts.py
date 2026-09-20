@@ -65,10 +65,10 @@ class TestCalculateExpectedAmounts:
             result = repo.calculate_expected_amounts(str(assignment_id))
         
         # Verify results
-        assert result['expected_cash'] == Decimal('350.75')
-        assert result['expected_sinpe'] == Decimal('0')
-        assert result['expected_card'] == Decimal('0')
-        assert result['expected_total'] == Decimal('350.75')
+        assert result.expected_cash == Decimal('350.75')
+        assert result.expected_sinpe == Decimal('0')
+        assert result.expected_card == Decimal('0')
+        assert result.expected_total == Decimal('350.75')
         
         # Cleanup
         with DatabaseConnection() as db:
@@ -96,10 +96,10 @@ class TestCalculateExpectedAmounts:
             result = repo.calculate_expected_amounts(str(assignment_id))
         
         # Verify results
-        assert result['expected_cash'] == Decimal('0')
-        assert result['expected_sinpe'] == Decimal('225.50')
-        assert result['expected_card'] == Decimal('0')
-        assert result['expected_total'] == Decimal('225.50')
+        assert result.expected_cash == Decimal('0')
+        assert result.expected_sinpe == Decimal('225.50')
+        assert result.expected_card == Decimal('0')
+        assert result.expected_total == Decimal('225.50')
         
         # Cleanup
         with DatabaseConnection() as db:
@@ -127,10 +127,10 @@ class TestCalculateExpectedAmounts:
             result = repo.calculate_expected_amounts(str(assignment_id))
         
         # Verify results
-        assert result['expected_cash'] == Decimal('0')
-        assert result['expected_sinpe'] == Decimal('0')
-        assert result['expected_card'] == Decimal('425.75')
-        assert result['expected_total'] == Decimal('425.75')
+        assert result.expected_cash == Decimal('0')
+        assert result.expected_sinpe == Decimal('0')
+        assert result.expected_card == Decimal('425.75')
+        assert result.expected_total == Decimal('425.75')
         
         # Cleanup
         with DatabaseConnection() as db:
@@ -162,10 +162,10 @@ class TestCalculateExpectedAmounts:
             result = repo.calculate_expected_amounts(str(assignment_id))
         
         # Verify results
-        assert result['expected_cash'] == Decimal('150.00')
-        assert result['expected_sinpe'] == Decimal('350.00')
-        assert result['expected_card'] == Decimal('400.00')
-        assert result['expected_total'] == Decimal('900.00')
+        assert result.expected_cash == Decimal('150.00')
+        assert result.expected_sinpe == Decimal('350.00')
+        assert result.expected_card == Decimal('400.00')
+        assert result.expected_total == Decimal('900.00')
         
         # Cleanup
         with DatabaseConnection() as db:
@@ -183,10 +183,10 @@ class TestCalculateExpectedAmounts:
             result = repo.calculate_expected_amounts(str(assignment_id))
         
         # Verify all amounts are zero
-        assert result['expected_cash'] == Decimal('0')
-        assert result['expected_sinpe'] == Decimal('0')
-        assert result['expected_card'] == Decimal('0')
-        assert result['expected_total'] == Decimal('0')
+        assert result.expected_cash == Decimal('0')
+        assert result.expected_sinpe == Decimal('0')
+        assert result.expected_card == Decimal('0')
+        assert result.expected_total == Decimal('0')
 
     def test_calculate_expected_amounts_without_sales_orders_table(self):
         """Test graceful fallback when sales_orders table doesn't exist."""
@@ -202,10 +202,10 @@ class TestCalculateExpectedAmounts:
             result = repo.calculate_expected_amounts(str(assignment_id))
         
         # Verify all amounts are zero (graceful fallback)
-        assert result['expected_cash'] == Decimal('0')
-        assert result['expected_sinpe'] == Decimal('0')
-        assert result['expected_card'] == Decimal('0')
-        assert result['expected_total'] == Decimal('0')
+        assert result.expected_cash == Decimal('0')
+        assert result.expected_sinpe == Decimal('0')
+        assert result.expected_card == Decimal('0')
+        assert result.expected_total == Decimal('0')
 
     def test_calculate_expected_amounts_with_decimal_precision(self, setup_sales_orders_table):
         """Test that decimal precision is maintained in calculations."""
@@ -227,10 +227,10 @@ class TestCalculateExpectedAmounts:
             result = repo.calculate_expected_amounts(str(assignment_id))
         
         # Verify decimal precision
-        assert result['expected_cash'] == Decimal('99.99')
-        assert result['expected_sinpe'] == Decimal('123.45')
-        assert result['expected_card'] == Decimal('67.89')
-        assert result['expected_total'] == Decimal('291.33')
+        assert result.expected_cash == Decimal('99.99')
+        assert result.expected_sinpe == Decimal('123.45')
+        assert result.expected_card == Decimal('67.89')
+        assert result.expected_total == Decimal('291.33')
         
         # Cleanup
         with DatabaseConnection() as db:
@@ -264,10 +264,10 @@ class TestCalculateExpectedAmounts:
             result = repo.calculate_expected_amounts(str(assignment_id_1))
         
         # Verify only assignment 1 orders are included
-        assert result['expected_cash'] == Decimal('100.00')
-        assert result['expected_sinpe'] == Decimal('200.00')
-        assert result['expected_card'] == Decimal('0')
-        assert result['expected_total'] == Decimal('300.00')
+        assert result.expected_cash == Decimal('100.00')
+        assert result.expected_sinpe == Decimal('200.00')
+        assert result.expected_card == Decimal('0')
+        assert result.expected_total == Decimal('300.00')
         
         # Cleanup
         with DatabaseConnection() as db:
@@ -279,3 +279,71 @@ class TestCalculateExpectedAmounts:
                 "assignment_id_2": str(assignment_id_2)
             })
             db.session.commit()
+
+
+class TestExpectedAmountsAvailability:
+    """`available` must distinguish "no source" from "the till expected nothing".
+
+    Those are not the same answer and must never be the same value.
+    `closings.cash_difference` is a GENERATED column — `declared_cash -
+    expected_cash` — so a zero expectation reports the cashier's entire declared
+    cash as a SURPLUS. Every closing. For ever.
+
+    And the no-source case is not hypothetical: `sales_orders` does not exist
+    (`to_regclass('sales_orders')` is NULL in dev), so the repository's except
+    branch is the only one that has ever run in production. The tests above pass
+    because a fixture creates the table for them.
+
+    The real fix needs the payment split, which lives on documents in sales-be —
+    no table this service owns has it. Recorded on the roadmap, not guessed at.
+    """
+
+    def test_a_real_measurement_is_available(self):
+        from app.repositories.closing_repository import ExpectedAmounts
+        amounts = ExpectedAmounts(
+            expected_cash=Decimal("10"), expected_sinpe=Decimal("0"),
+            expected_card=Decimal("0"), expected_total=Decimal("10"),
+        )
+        assert amounts.available is True
+
+    def test_a_genuine_zero_is_still_available(self):
+        """A till that sold nothing expected nothing — and that IS a measurement."""
+        from app.repositories.closing_repository import ExpectedAmounts
+        zero = Decimal("0")
+        amounts = ExpectedAmounts(expected_cash=zero, expected_sinpe=zero,
+                                  expected_card=zero, expected_total=zero)
+        assert amounts.available is True
+
+    def test_an_unreadable_source_is_not_available(self):
+        from app.repositories.closing_repository import ExpectedAmounts
+        amounts = ExpectedAmounts.unavailable()
+        assert amounts.available is False
+        assert amounts.expected_total == Decimal("0")
+
+    def test_the_two_are_distinguishable(self):
+        """The whole point: same numbers, different answers."""
+        from app.repositories.closing_repository import ExpectedAmounts
+        zero = Decimal("0")
+        measured = ExpectedAmounts(expected_cash=zero, expected_sinpe=zero,
+                                   expected_card=zero, expected_total=zero)
+        assert measured != ExpectedAmounts.unavailable()
+
+    def test_a_missing_table_reports_unavailable_rather_than_zero(self):
+        """The production path today, asserted without creating the fixture table.
+
+        Needs a database, like the fixture-backed tests above, and skips without
+        one for the same reason they do.
+        """
+        from sqlalchemy import text
+        from app.configuration.database_connection import DatabaseConnection
+        try:
+            with DatabaseConnection() as db:
+                exists = db.session.execute(
+                    text("SELECT to_regclass('sales_orders') IS NOT NULL")).scalar()
+        except Exception as exc:
+            pytest.skip(f"no database available: {exc}")
+        if exists:
+            pytest.skip("sales_orders exists here; the fixture-backed tests cover that path")
+        with ClosingRepository() as repo:
+            result = repo.calculate_expected_amounts(str(uuid.uuid4()))
+        assert result.available is False
