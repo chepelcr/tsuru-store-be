@@ -1002,32 +1002,6 @@
           }
         },
         {
-          "path": "/api/organizations/{organization_id}/clients/{client_id}",
-          "method": "PATCH",
-          "operation_id": "update_client_status_api_organizations__organization_id__clients__client_id__patch",
-          "summary": "Update client status",
-          "description": "Update client status. Cannot update deleted clients (status=3). Use POST to reactivate deleted clients.\n\n**Status codes:**\n- `1`: Active\n- `2`: Inactive\n- `3`: Deleted",
-          "path_params": [
-            {
-              "name": "organization_id",
-              "type": "string",
-              "required": true,
-              "description": "Organization identifier"
-            },
-            {
-              "name": "client_id",
-              "type": "string",
-              "required": true,
-              "description": "Client UUID"
-            }
-          ],
-          "query_params": [],
-          "response": {
-            "is_list": false,
-            "fields": []
-          }
-        },
-        {
           "path": "/api/organizations/{organization_id}/clients/{client_id}/assets",
           "method": "GET",
           "operation_id": "list_assets_api_organizations__organization_id__clients__client_id__assets_get",
@@ -1270,6 +1244,32 @@
               "type": "string",
               "required": true,
               "description": "Department UUID"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/clients/{client_id}/status",
+          "method": "PATCH",
+          "operation_id": "update_client_status_api_organizations__organization_id__clients__client_id__status_patch",
+          "summary": "Update client status",
+          "description": "Update client status. Cannot update deleted clients (status=3). Use POST to reactivate deleted clients.\n\n**Status codes:**\n- `1`: Active\n- `2`: Inactive\n- `3`: Deleted\n\nMoved here from `PATCH /clients/{client_id}`, which every other resource in this\nservice reserves for nothing and this one used for status. The POS sent its\ncustomer-edit payload to that path expecting a field update and got a 422 for a\nmissing `status` on every save, while its status mutation pointed at\n`/clients/{client_id}/status` — the convention every other controller follows —\nand hit no route at all. Both were off by exactly one path.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "client_id",
+              "type": "string",
+              "required": true,
+              "description": "Client UUID"
             }
           ],
           "query_params": [],

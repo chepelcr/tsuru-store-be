@@ -5,7 +5,7 @@ from typing import Annotated, Optional
 from fastapi import Body, FastAPI, HTTPException, Path, Query
 
 from app.dtos.requests.client_request_dto import ClientRequestDTO
-from app.dtos.requests.status_request_dto import StatusRequestDTO
+from app.dtos.requests.client_status_request_dto import ClientStatusRequestDTO
 from app.dtos.responses.client_dto import ClientListResponse, ClientResponse
 from app.services import client_service
 
@@ -126,13 +126,18 @@ class ClientsController:
                 return result
             except HTTPException:
                 raise
-            except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid client ID format")
+            except ValueError as e:
+                # `str(e)`, not a fixed string. This said "Invalid client ID
+                # format" for every ValueError, including the service's own
+                # "Cannot update deleted client. Use POST to reactivate." — so
+                # the one message that tells the caller what to do next was
+                # replaced by one that is simply untrue.
+                raise HTTPException(status_code=400, detail=str(e))
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
 
         @app.patch(
-            "/api/organizations/{organization_id}/clients/{client_id}",
+            "/api/organizations/{organization_id}/clients/{client_id}/status",
             response_model=ClientResponse,
             tags=["clients"],
             summary="Update client status",
@@ -142,12 +147,19 @@ class ClientsController:
 - `1`: Active
 - `2`: Inactive
 - `3`: Deleted
+
+Moved here from `PATCH /clients/{client_id}`, which every other resource in this
+service reserves for nothing and this one used for status. The POS sent its
+customer-edit payload to that path expecting a field update and got a 422 for a
+missing `status` on every save, while its status mutation pointed at
+`/clients/{client_id}/status` — the convention every other controller follows —
+and hit no route at all. Both were off by exactly one path.
 """,
         )
         async def update_client_status(
             organization_id: Annotated[str, Path(description="Organization identifier")],
             client_id: Annotated[str, Path(description="Client UUID")],
-            body: StatusRequestDTO = Body(...),
+            body: ClientStatusRequestDTO = Body(...),
         ):
             try:
                 result = client_service.update_client_status(organization_id, client_id, body.status)
@@ -156,7 +168,7 @@ class ClientsController:
                 return result
             except HTTPException:
                 raise
-            except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid client ID format")
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))

@@ -46,6 +46,7 @@ class ClientResponse(BaseModel):
     email: Optional[str] = Field(None)
     phone: Optional[PhoneResponse] = Field(None)
     residence: Optional[ResidenceResponse] = Field(None)
+    notes: Optional[str] = Field(None, description="Free-text notes about the customer")
 
     model_config = {"from_attributes": True}
 

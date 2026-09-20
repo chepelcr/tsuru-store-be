@@ -7294,14 +7294,16 @@
             }
           }
         }
-      },
+      }
+    },
+    "/api/organizations/{organization_id}/clients/{client_id}/status": {
       "patch": {
         "tags": [
           "clients"
         ],
         "summary": "Update client status",
-        "description": "Update client status. Cannot update deleted clients (status=3). Use POST to reactivate deleted clients.\n\n**Status codes:**\n- `1`: Active\n- `2`: Inactive\n- `3`: Deleted",
-        "operationId": "update_client_status_api_organizations__organization_id__clients__client_id__patch",
+        "description": "Update client status. Cannot update deleted clients (status=3). Use POST to reactivate deleted clients.\n\n**Status codes:**\n- `1`: Active\n- `2`: Inactive\n- `3`: Deleted\n\nMoved here from `PATCH /clients/{client_id}`, which every other resource in this\nservice reserves for nothing and this one used for status. The POS sent its\ncustomer-edit payload to that path expecting a field update and got a 422 for a\nmissing `status` on every save, while its status mutation pointed at\n`/clients/{client_id}/status` — the convention every other controller follows —\nand hit no route at all. Both were off by exactly one path.",
+        "operationId": "update_client_status_api_organizations__organization_id__clients__client_id__status_patch",
         "parameters": [
           {
             "name": "organization_id",
@@ -7331,7 +7333,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StatusRequestDTO"
+                "$ref": "#/components/schemas/ClientStatusRequestDTO"
               }
             }
           }
@@ -21301,6 +21303,18 @@
                 "type": "null"
               }
             ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Free-text notes about the customer"
           }
         },
         "type": "object",
@@ -21415,6 +21429,18 @@
                 "type": "null"
               }
             ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Free-text notes about the customer"
           }
         },
         "type": "object",
@@ -21424,6 +21450,27 @@
           "status"
         ],
         "title": "ClientResponse"
+      },
+      "ClientStatusRequestDTO": {
+        "properties": {
+          "status": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Status",
+            "description": "Client status (1=active, 2=inactive, 3=deleted)",
+            "examples": [
+              1,
+              2
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "ClientStatusRequestDTO",
+        "description": "Status update request for a client."
       },
       "ClosingCreateRequestDTO": {
         "properties": {
@@ -23015,8 +23062,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 50,
-                "minLength": 9
+                "maxLength": 50
               },
               {
                 "type": "null"

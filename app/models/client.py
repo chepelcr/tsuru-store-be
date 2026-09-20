@@ -44,6 +44,12 @@ class Client(Base, AuditMixin):
     neighborhood_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Free-text notes kept against the customer. The POS has shipped a notes
+    # panel and a save button for it all along, against a column that did not
+    # exist: `ClientRequestDTO` does not forbid extra keys, so the note was
+    # accepted, ignored and lost, and the panel read back empty every time.
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Relationships
     stores: Mapped[List["Store"]] = relationship(back_populates="client", cascade="all, delete-orphan")
     departments: Mapped[List["Department"]] = relationship(back_populates="client", cascade="all, delete-orphan")

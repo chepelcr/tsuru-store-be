@@ -109,8 +109,10 @@ class Order(Base, AuditMixin):
     # so an order that could only name a foreign id would have nothing to show
     # on its badge without a second service call per row.
     #
-    # Written by the SQS consumer when sales-be reports an ACCEPTED verdict, not
-    # by the checkout. See `services/order_service.link_order_document`.
+    # Written by the SQS consumer: claimed at emission with `status` 0
+    # (PROCESSING) so the order cannot be billed twice while the document is
+    # in flight, then confirmed to 1 when Hacienda accepts it. Not by the
+    # checkout. See `services/order_service.link_order_document`.
     document_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     document_info: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 

@@ -124,6 +124,7 @@ def create_client(
                 district_id=dto.residence.district_id if dto.residence else None,
                 neighborhood_id=dto.residence.neighborhood_id if dto.residence else None,
                 address=dto.residence.address if dto.residence else None,
+                notes=dto.notes,
             )
             client = repo.save(client)
 
@@ -183,6 +184,8 @@ def update_client(
                 client.neighborhood_id = dto.residence.neighborhood_id
             if dto.residence.address is not None:
                 client.address = dto.residence.address
+        if dto.notes is not None:
+            client.notes = dto.notes
 
         if client.status == 0:
             client.status = 1
@@ -254,4 +257,5 @@ def _map_client(client: Client) -> ClientResponse:
         email=client.email,
         phone=phone,
         residence=residence,
+        notes=client.notes,
     )

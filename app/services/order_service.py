@@ -1900,10 +1900,20 @@ def link_order_document(
     Without this the frontend cannot know a pedido is already invoiced, and
     nothing stops a second factura being issued for the same order.
 
-    Called from the SQS consumer on a LINK_ORDER_DOCUMENT event, which sales-be
-    publishes only once Hacienda has ACCEPTED the document — so unlike the
-    checkout POST this replaced, a rejected document never marks its order
-    billed, and a sale queued offline links when the outbox replays.
+    Called from the SQS consumer on a LINK_ORDER_DOCUMENT event, which arrives
+    TWICE for a document Hacienda accepts:
+
+    1. from sales-api at EMISSION, with `status` PROCESSING. This is the CLAIM,
+       and it is what stops the order being billed a second time while the
+       document is still in flight — the link used to be written only on the
+       verdict, which left a window in which a real document existed and the
+       order still looked billable;
+    2. from document-validator when Hacienda ACCEPTS it, moving the stored
+       status to 1.
+
+    Re-linking the SAME document is therefore the normal path rather than an
+    edge case: step 2 is an update of what step 1 wrote. A sale queued offline
+    claims its order when the outbox replays.
 
     Returns ``None`` rather than raising when there is nothing to link, because
     the caller is a queue and every raise here is a retry:
@@ -1916,7 +1926,11 @@ def link_order_document(
         second document for the same order is a real problem, but it is one to
         investigate in the data, not to hammer a queue over.
 
-    Re-linking the SAME document is a no-op, so a redelivered message is safe.
+    A redelivered message is safe: the write is idempotent for a given document.
+
+    Note what this means for a REJECTED document — the claim from step 1 stays,
+    so the order remains unbillable. Releasing it is a deliberate act through
+    the repair endpoint, not something a verdict does on its own.
     """
     document_id = (document or {}).get("document_id")
     if not document_id:
