@@ -1962,8 +1962,8 @@
           "path": "/api/organizations/{organization_id}/dashboard",
           "method": "GET",
           "operation_id": "get_dashboard_api_organizations__organization_id__dashboard_get",
-          "summary": "Get real-time dashboard data",
-          "description": "Get real-time sales dashboard data for an organization.\n\n**Query Parameters:**\n- `session_id`: Optional UUID to filter by specific session\n\n**Response:**\nReturns aggregated dashboard data including:\n- `stands`: Array of stand/branch data with sales metrics\n  - `id`: Branch ID\n  - `name`: Branch name\n  - `cashier_name`: Assigned cashier name\n  - `context`: Session context (gradas/mesa/caja)\n  - `total_revenue`: Total revenue for this stand\n  - `sales_count`: Number of sales\n  - `cash`: Cash payment total\n  - `sinpe`: SINPE payment total\n  - `card`: Card payment total\n  - `last_sync_at`: Timestamp of last order sync\n- `total_revenue`: Total revenue across all stands\n- `total_sales`: Total number of sales across all stands\n- `avg_ticket`: Average ticket value (total_revenue / total_sales)\n- `product_ranking`: Top 10 products by revenue\n  - `name`: Product name\n  - `emoji`: Product image/emoji\n  - `units`: Units sold\n  - `revenue`: Total revenue for this product\n\n**Logic:**\n1. Gets active sessions for the organization (optionally filtered by session_id)\n2. Gets active assignments for those sessions\n3. Aggregates sales data from orders by assignment\n4. Calculates payment method breakdowns\n5. Computes product rankings\n6. Calculates global KPIs (total_revenue, total_sales, avg_ticket)\n\n**Examples:**\n- Get dashboard for all active sessions: `/api/organizations/{orgId}/dashboard`\n- Get dashboard for specific session: `/api/organizations/{orgId}/dashboard?session_id={sessionId}`\n\n**Authorization:**\n- User must be a member of the organization (enforced at API Gateway/auth layer)",
+          "summary": "DEPRECATED — the whole dashboard in one payload",
+          "description": "Superseded by the five panel endpoints, which load and fail independently. Kept for one release so a deployed client does not break the moment the panels ship.\n\nIt is now composed FROM those panels, so it reports the real organization totals rather than the zeros it returned whenever no cashier had a till open. `cash`/`sinpe`/`card` are always 0 here — nothing read them.",
           "path_params": [
             {
               "name": "organization_id",
@@ -1977,7 +1977,235 @@
               "name": "session_id",
               "type": "string",
               "required": false,
-              "description": "Optional session UUID to filter by specific session"
+              "description": "Filter to one session"
+            }
+          ],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/dashboard/order-status",
+          "method": "GET",
+          "operation_id": "get_order_status_api_organizations__organization_id__dashboard_order_status_get",
+          "summary": "Order counts and value per status",
+          "description": "Every status the organization's orders are in, busiest first, with the in-flight ones rolled up into `open_orders` / `open_value`. This is what answers \"I have orders in process\" — the single-revenue-total dashboard could not show it at all.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            }
+          ],
+          "query_params": [
+            {
+              "name": "session_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one session"
+            },
+            {
+              "name": "user_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one person (admins only; ignored otherwise)"
+            }
+          ],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/dashboard/sales-summary",
+          "method": "GET",
+          "operation_id": "get_sales_summary_api_organizations__organization_id__dashboard_sales_summary_get",
+          "summary": "Revenue, order count and average ticket",
+          "description": "Counted from the organization's orders, so the figures are correct whether or not a cashier has a session open. Cancelled orders are excluded — they are not revenue, and including them would drag the average ticket toward a meaningless number.\n\nOptional `date_from`/`date_to` (ISO dates, inclusive) narrow the window. Filtering uses the `created_on` timestamp, never the `creation_date` string.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            }
+          ],
+          "query_params": [
+            {
+              "name": "date_from",
+              "type": "string",
+              "required": false,
+              "description": "ISO date, inclusive"
+            },
+            {
+              "name": "date_to",
+              "type": "string",
+              "required": false,
+              "description": "ISO date, inclusive"
+            },
+            {
+              "name": "session_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one session"
+            },
+            {
+              "name": "user_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one person (admins only; ignored otherwise)"
+            }
+          ],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/dashboard/sales-trend",
+          "method": "GET",
+          "operation_id": "get_sales_trend_api_organizations__organization_id__dashboard_sales_trend_get",
+          "summary": "Revenue per hour, day, week, month or year",
+          "description": "Revenue and order count per bucket, oldest first.\n\n`granularity` is one of `hour`, `day`, `week`, `month`, `year`. Combine it with `date_from`/`date_to` (ISO dates, inclusive) for a chosen period — `hour` over a single day, `month` over a year.\n\nBuckets with no sales are ABSENT rather than zero: a missing bucket and a zero bucket are different facts, and the caller knows the window it asked for. Bucket starts are ISO 8601 with a time component at every granularity, so a client never has to guess which shape it received.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            }
+          ],
+          "query_params": [
+            {
+              "name": "granularity",
+              "type": "string",
+              "required": false,
+              "description": "One of: hour, day, week, month, year"
+            },
+            {
+              "name": "date_from",
+              "type": "string",
+              "required": false,
+              "description": "ISO date, inclusive"
+            },
+            {
+              "name": "date_to",
+              "type": "string",
+              "required": false,
+              "description": "ISO date, inclusive"
+            },
+            {
+              "name": "session_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one session"
+            },
+            {
+              "name": "user_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one person (admins only; ignored otherwise)"
+            }
+          ],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/dashboard/session-sales",
+          "method": "GET",
+          "operation_id": "get_session_sales_api_organizations__organization_id__dashboard_session_sales_get",
+          "summary": "\"Ventas de la sesión\" — what is on the books now",
+          "description": "A different question from revenue, and a different set of statuses: `pending`, `processing` and `shipped` always count, and `delivered` counts only when it was delivered TODAY. A pedido delivered last week is finished business and should not still be inflating today's figure.\n\n`delivered_rule` says which rule was applied. It reads `created_today` for now: `delivery_date` is a VARCHAR holding two different formats, so it cannot be compared to today without misreading the month, and the response says so rather than implying a delivery-date rule it is not yet applying.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            }
+          ],
+          "query_params": [
+            {
+              "name": "session_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one session"
+            },
+            {
+              "name": "user_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one person (admins only; ignored otherwise)"
+            }
+          ],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/dashboard/stations",
+          "method": "GET",
+          "operation_id": "get_stations_api_organizations__organization_id__dashboard_stations_get",
+          "summary": "Tills currently open, and their takings",
+          "description": "The only panel that legitimately depends on an open session — it is the question \"who is working\". An empty list means nobody is on a till, which no longer affects the sales figures.\n\nPer-station takings come from orders carrying that `assignment_id`; most orders do not carry one, which is exactly why organization-wide revenue is a separate endpoint.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            }
+          ],
+          "query_params": [
+            {
+              "name": "session_id",
+              "type": "string",
+              "required": false,
+              "description": "Filter to one session"
+            }
+          ],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/dashboard/top-products",
+          "method": "GET",
+          "operation_id": "get_top_products_api_organizations__organization_id__dashboard_top_products_get",
+          "summary": "Best-selling products by revenue",
+          "description": "Ranked from the order lines, filtered to revenue statuses so a cancelled order cannot recommend restocking something nobody bought. `limit` is clamped server-side.",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            }
+          ],
+          "query_params": [
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false,
+              "description": "How many products"
+            },
+            {
+              "name": "session_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one session"
+            },
+            {
+              "name": "user_id",
+              "type": "string",
+              "required": false,
+              "description": "Scope to one person (admins only; ignored otherwise)"
             }
           ],
           "response": {
@@ -2225,9 +2453,9 @@
         {
           "path": "/api/organizations/{organization_id}/orders/{document_number}",
           "method": "PATCH",
-          "operation_id": "update_order_status_api_organizations__organization_id__orders__document_number__patch",
-          "summary": "Update order status",
-          "description": "",
+          "operation_id": "update_order_api_organizations__organization_id__orders__document_number__patch",
+          "summary": "Update an order's status and/or delivery date",
+          "description": "Both fields are optional; at least one is required, so a status-only body keeps working.\n\n**Delivery date** may be changed only while the order is `pending`, is not yet billed, and the new date is not in the past — moving it alters a commitment to the customer rather than recording what happened. The order's spreadsheets are rewritten to match, because `reprocess` re-reads them and would otherwise revert a database-only change.\n\nAn illegal status transition or a refused date is **400**, not 500: both are things the caller can correct.",
           "path_params": [
             {
               "name": "organization_id",
@@ -2399,9 +2627,9 @@
         {
           "path": "/api/organizations/{organization_id}/orders/{document_number}/invoice",
           "method": "POST",
-          "operation_id": "link_order_invoice_api_organizations__organization_id__orders__document_number__invoice_post",
-          "summary": "Record that a delivered order was billed",
-          "description": "Link an order to the electronic document that billed it.\n\nWithout this link the frontend cannot tell that a pedido is already invoiced,\nso nothing prevents a second factura for the same order. Returns **409** if the\norder is already linked to a different sale.",
+          "operation_id": "link_order_document_api_organizations__organization_id__orders__document_number__invoice_post",
+          "summary": "Repair the link between an order and the document that billed it",
+          "description": "Link an order to the electronic document that billed it.\n\n**This is a repair path, not the normal one.** The link is normally written by\nthis service's SQS consumer when sales-be reports that Hacienda ACCEPTED the\ndocument (`LINK_ORDER_DOCUMENT`). Use this endpoint when that event was lost —\nnever from a checkout: a document is not known to bill anything until Hacienda\nhas accepted it, and linking at checkout time is exactly what marked orders as\nbilled by documents that were later rejected.\n\nReturns **409** if the order is already linked to a different document, and\n**404** if no such order exists. The queue consumer treats both as ordinary and\nsimply drops the message; here they are errors, because a human asked.",
           "path_params": [
             {
               "name": "organization_id",

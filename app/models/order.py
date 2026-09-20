@@ -97,14 +97,22 @@ class Order(Base, AuditMixin):
     odometer: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     reported_issue: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-    # --- Billing link (TSR-152 §3.4) --------------------------------------
+    # --- Billing link (TSR-152 §3.4, reshaped TSR-317) --------------------
     # Without this a delivered pedido can be invoiced twice: the FE can only
     # hide the button when the BE says it is already billed.
-    invoice_sale_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    invoice_document_type: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
-    invoice_consecutive_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    invoice_document_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    invoice_issued_on: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    #
+    # One id plus one snapshot, replacing the five flat `invoice_*` columns.
+    # `document_id` is sales-be's `Sale.sale_id` UUID — the identifier the POS
+    # routes a document by (`/dashboard/documents/{saleId}`), so the order links
+    # straight to it. `document_info` is the rest of the document, denormalised
+    # deliberately: store-be does not own `billing_sales` and cannot join to it,
+    # so an order that could only name a foreign id would have nothing to show
+    # on its badge without a second service call per row.
+    #
+    # Written by the SQS consumer when sales-be reports an ACCEPTED verdict, not
+    # by the checkout. See `services/order_service.link_order_document`.
+    document_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    document_info: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # --- Storefront (anonymous) pedido fields (TSR-118 / W11) --------------
     # A tracked order placed from a public storefront. The customer is a guest
@@ -156,6 +164,7 @@ class Order(Base, AuditMixin):
         Index("idx_order_document_number", "document_number"),
         Index("idx_order_company_document", "company_id", "document_number", unique=True),
         Index("idx_order_source", "company_id", "source"),
+        Index("idx_order_document_id", "company_id", "document_id"),
         Index(
             "idx_order_idempotency",
             "company_id",

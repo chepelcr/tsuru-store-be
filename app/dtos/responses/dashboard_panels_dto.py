@@ -124,7 +124,7 @@ class SalesTrendResponse(BaseModel):
     for.
     """
 
-    granularity: str = Field(..., description="hour | day | week | month",
+    granularity: str = Field(..., description="hour | day | week | month | year",
                              examples=["day"])
     date_from: Optional[str] = Field(None, description="Window start, if given")
     date_to: Optional[str] = Field(None, description="Window end, if given")

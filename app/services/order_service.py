@@ -550,7 +550,7 @@ def update_order(
         legitimately be rescheduled. Once it has SHIPPED the date has been acted
         on, and once delivered or cancelled it is history; a `quote` is not a
         placed order yet.
-      * **Not billed.** `invoice_sale_id` present means a fiscal document exists
+      * **Not billed.** `document_id` present means a fiscal document exists
         against this order, and its delivery date is on that document.
       * **Not in the past.** The same rule `_validate_order_dates` applies when a
         confirmation is built, so the two cannot disagree.
@@ -608,10 +608,11 @@ DELIVERY_DATE_EDITABLE_STATUSES = (
 
 def _assert_delivery_date_editable(order, new_date: date) -> None:
     """Raise `ValueError` unless this order's delivery date may be moved."""
-    if order.invoice_sale_id:
+    if order.document_id:
+        consecutive = (order.document_info or {}).get("consecutive_number")
         raise ValueError(
             f"Order {order.document_number} has been billed "
-            f"(document {order.invoice_consecutive_number or order.invoice_sale_id}); "
+            f"(document {consecutive or order.document_id}); "
             "its delivery date is on that document and cannot be changed here"
         )
 
@@ -1864,36 +1865,93 @@ def generate_order_ticket(organization_id: str, document_number: str) -> OrderRe
         return order_to_response(order)
 
 
-def link_order_invoice(
+#: Fields of the document snapshot an order stores, in the order they are shown.
+#:
+#: The event may carry more than this (it is a published contract and may grow);
+#: an order keeps only what its badge and detail page need, so a new field
+#: upstream does not silently widen a row here.
+DOCUMENT_INFO_FIELDS = (
+    "document_id",
+    "document_number",
+    "document_type",
+    "consecutive_number",
+    "document_key",
+    "issued_on",
+    "status",
+    "total_amount",
+    "currency_code",
+)
+
+
+def find_order(organization_id: str, document_number: str):
+    """The order row, or None. Read-only — for callers that need to inspect it
+    before deciding what status to answer with (the repair endpoint)."""
+    with OrderRepository() as repo:
+        return repo.find_by_company_and_document(organization_id, document_number)
+
+
+def link_order_document(
     organization_id: str,
     document_number: str,
-    sale_id: str,
-    document_type: Optional[str] = None,
-    consecutive_number: Optional[str] = None,
-    document_key: Optional[str] = None,
-    issued_on: Optional[str] = None,
-) -> OrderResponse:
-    """Record that a delivered order was billed.
+    document: dict,
+) -> Optional[OrderResponse]:
+    """Record which electronic document billed a delivered order.
 
     Without this the frontend cannot know a pedido is already invoiced, and
     nothing stops a second factura being issued for the same order.
+
+    Called from the SQS consumer on a LINK_ORDER_DOCUMENT event, which sales-be
+    publishes only once Hacienda has ACCEPTED the document — so unlike the
+    checkout POST this replaced, a rejected document never marks its order
+    billed, and a sale queued offline links when the outbox replays.
+
+    Returns ``None`` rather than raising when there is nothing to link, because
+    the caller is a queue and every raise here is a retry:
+
+      * **no such order** — ordinary, not an error. The order number is read off
+        the document's coded free-text block, and a cashier may type a chain's
+        purchase-order number by hand into a document that bills no order of
+        ours. Retrying cannot make the order exist.
+      * **already linked to a different document** — the first link stands. A
+        second document for the same order is a real problem, but it is one to
+        investigate in the data, not to hammer a queue over.
+
+    Re-linking the SAME document is a no-op, so a redelivered message is safe.
     """
+    document_id = (document or {}).get("document_id")
+    if not document_id:
+        raise ValueError("LINK_ORDER_DOCUMENT carries no document_id")
+
     with OrderRepository() as repo:
         order = repo.find_by_company_and_document(organization_id, document_number)
         if not order:
-            raise LookupError(f"Order '{document_number}' not found")
-
-        if order.invoice_sale_id and order.invoice_sale_id != sale_id:
-            raise FileExistsError(
-                f"Order '{document_number}' is already invoiced as "
-                f"{order.invoice_consecutive_number or order.invoice_sale_id}"
+            logger.warning(
+                "LINK_ORDER_DOCUMENT: no order '%s' for organization %s — document %s "
+                "bills no order of ours; dropping.",
+                document_number, organization_id, document_id,
             )
+            return None
 
-        order.invoice_sale_id = sale_id
-        order.invoice_document_type = document_type
-        order.invoice_consecutive_number = consecutive_number
-        order.invoice_document_key = document_key
-        order.invoice_issued_on = issued_on or datetime.now(timezone.utc).isoformat()
+        if order.document_id and order.document_id != document_id:
+            existing = (order.document_info or {}).get("consecutive_number")
+            logger.error(
+                "LINK_ORDER_DOCUMENT: order '%s' is already billed by %s; refusing to "
+                "relink it to %s.",
+                document_number, existing or order.document_id, document_id,
+            )
+            return None
+
+        order.document_id = document_id
+        order.document_info = {
+            key: document[key] for key in DOCUMENT_INFO_FIELDS if key in document
+        }
+        order.document_info.setdefault(
+            "issued_on", datetime.now(timezone.utc).isoformat()
+        )
 
         order = repo.save(order)
+        logger.info(
+            "LINK_ORDER_DOCUMENT: order '%s' linked to document %s",
+            document_number, document_id,
+        )
         return order_to_response(order)

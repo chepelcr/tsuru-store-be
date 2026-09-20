@@ -158,12 +158,25 @@ class OrderResponse(BaseModel):
         description="True while order_status is 'quote' (a proforma awaiting approval)",
     )
 
-    invoice: Optional[dict] = Field(
+    document_id: Optional[str] = Field(
         None,
         description=(
-            "The electronic document that billed this order, once linked. "
-            "Its presence is what lets the UI hide 'Facturar pedido' and stop "
-            "a second factura being issued."
+            "Identifier of the electronic document that billed this order, once "
+            "linked — the sale UUID, which is what the POS routes a document by. "
+            "Its presence is what lets the UI hide 'Facturar pedido' and stop a "
+            "second factura being issued."
+        ),
+    )
+
+    document_info: Optional[dict] = Field(
+        None,
+        description=(
+            "That document, reduced to what the order needs to show: "
+            "`document_id`, `document_number`, `document_type`, "
+            "`consecutive_number`, `document_key`, `issued_on`, `status` "
+            "(Hacienda verdict), `total_amount`, `currency_code`. Written when "
+            "Hacienda accepts the document, not at checkout time, so it is "
+            "absent while a document is still being validated."
         ),
     )
 

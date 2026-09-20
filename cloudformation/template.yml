@@ -39,7 +39,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "cd-backend-${Environment}-lambda"
-      Description: "Cross-Docking Backend API and Hacienda branch discovery consumer"
+      Description: "Cross-Docking Backend API, branch discovery and order-link consumer"
       PackageType: Image
       ImageUri: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRImageURIParam}:latest"
       Role: !GetAtt LambdaRole.Arn
@@ -51,6 +51,17 @@ Resources:
           Properties:
             Queue: !ImportValue
               'Fn::Sub': "tsuru-${Environment}-organization-branches-queue-arn"
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+        # Which electronic document billed an order (TSR-317). Published by
+        # sales-be's document-validator on an ACCEPTED Hacienda verdict; both
+        # sources funnel into the one handler, which dispatches on `event_type`.
+        OrderDocumentLink:
+          Type: SQS
+          Properties:
+            Queue: !ImportValue
+              'Fn::Sub': "tsuru-${Environment}-order-document-link-queue-arn"
             BatchSize: 10
             FunctionResponseTypes:
               - ReportBatchItemFailures
@@ -94,6 +105,17 @@ Resources:
                   - sqs:GetQueueAttributes
                 Resource: !ImportValue
                   'Fn::Sub': "tsuru-${Environment}-organization-branches-queue-arn"
+        - PolicyName: OrderDocumentLinkConsumer
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !ImportValue
+                  'Fn::Sub': "tsuru-${Environment}-order-document-link-queue-arn"
 
   CrossDockingBackendLogGroup:
     Type: AWS::Logs::LogGroup

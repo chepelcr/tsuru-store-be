@@ -39,8 +39,8 @@ def order(**overrides):
     stub = MagicMock()
     stub.document_number = "4500123456"
     stub.order_status = OrderStatus.PENDING.value
-    stub.invoice_sale_id = None
-    stub.invoice_consecutive_number = None
+    stub.document_id = None
+    stub.document_info = None
     stub.excel_url = "https://files.example/4500123456-DT.xlsx"
     stub.crossdocking_excel_url = None
     for key, value in overrides.items():
@@ -73,16 +73,16 @@ class TestTheGuards:
         """The date is on the fiscal document; changing it here would diverge."""
         with pytest.raises(ValueError, match="has been billed"):
             _assert_delivery_date_editable(
-                order(invoice_sale_id="sale-1",
-                      invoice_consecutive_number="00100001010000000123"),
+                order(document_id="sale-1",
+                      document_info={"consecutive_number": "00100001010000000123"}),
                 TOMORROW,
             )
 
     def test_the_error_names_the_document_that_blocks_it(self):
         with pytest.raises(ValueError, match="00100001010000000123"):
             _assert_delivery_date_editable(
-                order(invoice_sale_id="sale-1",
-                      invoice_consecutive_number="00100001010000000123"),
+                order(document_id="sale-1",
+                      document_info={"consecutive_number": "00100001010000000123"}),
                 TOMORROW,
             )
 
@@ -134,7 +134,7 @@ class TestUpdateOrder:
         rewrite.assert_not_called()
 
     def test_a_refused_date_is_not_saved(self, repo, rewrite):
-        existing = order(invoice_sale_id="sale-1")
+        existing = order(document_id="sale-1")
         repo.find_by_company_and_document.return_value = existing
 
         with pytest.raises(ValueError, match="has been billed"):

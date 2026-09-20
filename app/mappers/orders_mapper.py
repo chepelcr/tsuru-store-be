@@ -172,17 +172,8 @@ def order_to_response(order: Order) -> OrderResponse:
         currency_code=order.currency_code,
         exchange_rate=float(order.exchange_rate) if order.exchange_rate is not None else None,
         is_quote=(order.order_status == "quote"),
-        invoice=(
-            {
-                "sale_id": order.invoice_sale_id,
-                "document_type": order.invoice_document_type,
-                "consecutive_number": order.invoice_consecutive_number,
-                "document_key": order.invoice_document_key,
-                "issued_on": order.invoice_issued_on,
-            }
-            if order.invoice_sale_id
-            else None
-        ),
+        document_id=order.document_id,
+        document_info=order.document_info if order.document_id else None,
         order_id=order.order_id,
         company_id=order.company_id,
         document_number=order.document_number,

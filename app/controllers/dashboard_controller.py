@@ -13,7 +13,7 @@ with nothing to show cannot blank the ones beside it:
     /dashboard/sales-summary   what we have sold
     /dashboard/order-status    what is in flight  (the "4 in process" panel)
     /dashboard/top-products    what is selling
-    /dashboard/sales-trend     the chart, at hour / day / week / month
+    /dashboard/sales-trend     the chart, at hour / day / week / month / year
     /dashboard/session-sales   "ventas de la sesión" — open plus today's deliveries
     /dashboard/stations        who is on a till right now
 
@@ -140,10 +140,10 @@ class DashboardController:
             f"{ORG}/sales-trend",
             response_model=SalesTrendResponse,
             tags=["dashboard"],
-            summary="Revenue per hour, day, week or month",
+            summary="Revenue per hour, day, week, month or year",
             description=(
                 "Revenue and order count per bucket, oldest first.\n\n"
-                "`granularity` is one of `hour`, `day`, `week`, `month`. Combine "
+                "`granularity` is one of `hour`, `day`, `week`, `month`, `year`. Combine "
                 "it with `date_from`/`date_to` (ISO dates, inclusive) for a chosen "
                 "period — `hour` over a single day, `month` over a year.\n\n"
                 "Buckets with no sales are ABSENT rather than zero: a missing "

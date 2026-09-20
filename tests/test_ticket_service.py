@@ -32,8 +32,10 @@ def _order(**kw) -> Order:
     ])
     o.crossdocking_sale_points = []
     o.odometer = kw.get("odometer")
-    o.invoice_consecutive_number = kw.get("consecutive")
-    o.invoice_document_key = kw.get("key")
+    o.document_info = {
+        "consecutive_number": kw.get("consecutive"),
+        "document_key": kw.get("key"),
+    }
     return o
 
 

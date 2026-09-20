@@ -143,33 +143,51 @@ es un comprobante fiscal" under it), `ORDEN DE TRABAJO` for a taller OT,
             "/api/organizations/{organization_id}/orders/{document_number}/invoice",
             response_model=OrderResponse,
             tags=["orders"],
-            summary="Record that a delivered order was billed",
+            summary="Repair the link between an order and the document that billed it",
             description="""Link an order to the electronic document that billed it.
 
-Without this link the frontend cannot tell that a pedido is already invoiced,
-so nothing prevents a second factura for the same order. Returns **409** if the
-order is already linked to a different sale.
+**This is a repair path, not the normal one.** The link is normally written by
+this service's SQS consumer when sales-be reports that Hacienda ACCEPTED the
+document (`LINK_ORDER_DOCUMENT`). Use this endpoint when that event was lost —
+never from a checkout: a document is not known to bill anything until Hacienda
+has accepted it, and linking at checkout time is exactly what marked orders as
+billed by documents that were later rejected.
+
+Returns **409** if the order is already linked to a different document, and
+**404** if no such order exists. The queue consumer treats both as ordinary and
+simply drops the message; here they are errors, because a human asked.
 """,
         )
-        async def link_order_invoice(
+        async def link_order_document(
             organization_id: Annotated[str, Path(description="Organization identifier")],
             document_number: Annotated[str, Path(description="Order document number")],
             body: LinkOrderInvoiceDTO = Body(...),
         ):
             try:
-                return order_service.link_order_invoice(
+                order = order_service.find_order(organization_id, document_number)
+                if order is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Order '{document_number}' not found",
+                    )
+                if order.document_id and order.document_id != body.document_id:
+                    existing = (order.document_info or {}).get("consecutive_number")
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"Order '{document_number}' is already billed by "
+                            f"{existing or order.document_id}"
+                        ),
+                    )
+                return order_service.link_order_document(
                     organization_id,
                     document_number,
-                    sale_id=body.sale_id,
-                    document_type=body.document_type,
-                    consecutive_number=body.consecutive_number,
-                    document_key=body.document_key,
-                    issued_on=body.issued_on,
+                    body.model_dump(exclude_none=True),
                 )
-            except FileExistsError as e:
-                raise HTTPException(status_code=409, detail=str(e))
-            except LookupError as e:
-                raise HTTPException(status_code=404, detail=str(e))
+            except HTTPException:
+                raise
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
 

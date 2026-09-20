@@ -78,7 +78,9 @@ ROW_ACTIVE = 1
 #: The buckets `date_trunc` may be given. WHITELISTED, not passed through: the
 #: value is interpolated into the SQL (date_trunc's first argument cannot be a
 #: bind parameter), so an unchecked request string here would be injection.
-GRANULARITIES = ("hour", "day", "week", "month")
+#: `year` is here so the Pedidos source offers the same four report periods as
+#: the Documentos one — diario, semanal, mensual, anual.
+GRANULARITIES = ("hour", "day", "week", "month", "year")
 DEFAULT_GRANULARITY = "day"
 
 #: Orders are attributed to a till through `assignment_id`, which is VARCHAR on

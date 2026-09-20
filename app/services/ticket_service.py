@@ -167,13 +167,22 @@ def build_order_ticket_context(order: Order, **overrides: Any) -> Dict[str, Any]
         "delivery_location": delivery_location,
         "department": order.department_rel.name if order.department_rel else None,
         "comment": order.comment,
-        "consecutive_number": order.invoice_consecutive_number,
-        "document_key": order.invoice_document_key,
-        "qr_data_uri": _qr_data_uri(order.invoice_document_key or ""),
+        # The document that billed this order, when one has. Written by the
+        # order-link consumer (TSR-317), so a ticket printed before Hacienda
+        # accepts simply has no consecutive and no QR — which is honest: there
+        # is no accepted document to point a QR at yet.
+        "consecutive_number": _document_info(order).get("consecutive_number"),
+        "document_key": _document_info(order).get("document_key"),
+        "qr_data_uri": _qr_data_uri(_document_info(order).get("document_key") or ""),
         "footer": DEFAULT_FOOTER,
     }
     context.update(overrides)
     return context
+
+
+def _document_info(order: Order) -> dict:
+    """The order's document snapshot, or an empty dict when it is not billed."""
+    return order.document_info or {}
 
 
 def render_ticket_html(order: Order, **overrides: Any) -> str:
