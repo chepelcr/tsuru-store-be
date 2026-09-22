@@ -10,7 +10,11 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.configuration.database_connection import DatabaseConnection
+from app.models.branch import Branch
 from app.models.consecutive import Consecutive
+from app.models.consecutive_adjustment import ConsecutiveAdjustment
+from app.models.document_type import DocumentType
+from app.models.terminal import Terminal
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +111,15 @@ class ConsecutiveRepository(DatabaseConnection):
         order_by=None,
         page: int = 1,
         page_size: int = 12,
-    ) -> Tuple[List[Consecutive], int]:
+    ) -> Tuple[List[Tuple[Consecutive, Terminal, Branch, DocumentType]], int]:
+        """Page of consecutives with the terminal, branch and document type
+        each belongs to.
+
+        The joins are unconditional: the search enum's join fields
+        (`terminal.*`, `terminal.branch.*`, `document_type.*`) produce column
+        filters on those tables, and every row needs them for display anyway.
+        All three FKs are NOT NULL, so the inner joins drop nothing.
+        """
         try:
             base = [
                 Consecutive.organization_id == organization_id,
@@ -115,23 +127,82 @@ class ConsecutiveRepository(DatabaseConnection):
             ]
             if filters:
                 base.extend(filters)
-            stmt = select(Consecutive).where(and_(*base))
+            stmt = (
+                select(Consecutive, Terminal, Branch, DocumentType)
+                .join(Terminal, Terminal.terminal_id == Consecutive.terminal_id)
+                .join(Branch, Branch.branch_id == Terminal.branch_id)
+                .join(DocumentType, DocumentType.id == Consecutive.document_type_id)
+                .where(and_(*base))
+            )
             total = self.session.execute(
                 select(func.count()).select_from(stmt.subquery())
             ).scalar() or 0
+            # SearchUtils returns (clause, "ASC"|"DESC").
+            if isinstance(order_by, tuple):
+                order_by = order_by[0]
             if order_by is not None:
                 stmt = stmt.order_by(order_by)
             else:
-                stmt = stmt.order_by(Consecutive.consecutive_id)
-            items = list(
-                self.session.execute(
-                    stmt.offset((page - 1) * page_size).limit(page_size)
-                ).scalars().all()
-            )
-            return items, total
+                stmt = stmt.order_by(Branch.code, Terminal.code, DocumentType.code)
+            rows = self.session.execute(
+                stmt.offset((page - 1) * page_size).limit(page_size)
+            ).all()
+            return [tuple(r) for r in rows], total
         except SQLAlchemyError as e:
             logger.error(f"Error finding paginated consecutives: {e}", exc_info=True)
             raise
+
+    def find_with_context(
+        self, consecutive_id: str, organization_id: str
+    ) -> Optional[Tuple[Consecutive, Terminal, Branch, DocumentType]]:
+        rows, _ = self.find_all_paginated(
+            organization_id,
+            filters=[Consecutive.consecutive_id == uuid.UUID(consecutive_id)],
+            page=1,
+            page_size=1,
+        )
+        return rows[0] if rows else None
+
+    def lock_for_update(self, consecutive_id: str, organization_id: str) -> Optional[Consecutive]:
+        """Row lock shared with the sales allocator (`increment_and_format`
+        selects the same row FOR UPDATE), so a manual edit and a sale being
+        numbered at the same moment serialize instead of interleaving.
+        Held until the surrounding transaction commits.
+        """
+        stmt = (
+            select(Consecutive)
+            .where(
+                and_(
+                    Consecutive.consecutive_id == uuid.UUID(consecutive_id),
+                    Consecutive.organization_id == organization_id,
+                    Consecutive.deleted_on.is_(None),
+                )
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        return self.session.execute(stmt).scalar_one_or_none()
+
+    def add_adjustment(self, adjustment: ConsecutiveAdjustment) -> ConsecutiveAdjustment:
+        self.session.add(adjustment)
+        self.session.flush()
+        return adjustment
+
+    def find_adjustments(
+        self, consecutive_id: str, organization_id: str, limit: int = 50
+    ) -> List[ConsecutiveAdjustment]:
+        stmt = (
+            select(ConsecutiveAdjustment)
+            .where(
+                and_(
+                    ConsecutiveAdjustment.consecutive_id == uuid.UUID(consecutive_id),
+                    ConsecutiveAdjustment.organization_id == organization_id,
+                )
+            )
+            .order_by(ConsecutiveAdjustment.changed_on.desc())
+            .limit(limit)
+        )
+        return list(self.session.execute(stmt).scalars().all())
 
     def save(self, consecutive: Consecutive) -> Consecutive:
         try:

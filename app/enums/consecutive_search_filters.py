@@ -9,9 +9,25 @@ ENTITY_ALL = {ENTITY_CONSECUTIVE}
 
 
 class ConsecutiveSearchFilters(Enum):
+    """`search=` fields for GET /consecutives.
+
+    The join fields resolve through the view-only relationships on
+    `Consecutive` (`terminal`, `terminal.branch`, `document_type`); the
+    repository always joins those tables, so filtering on them is safe.
+
+    Mirrored by the POS enum `ConsecutiveSearchFilter`
+    (fe/pos-system/src/lib/consecutiveSearchBuilder.ts) — keep them in sync.
+    """
+
     TERMINAL_ID = ("terminal_id", "terminal_id", False, None, True, ENTITY_ALL, False, False, True, False)
     DOCUMENT_TYPE_ID = ("document_type_id", "document_type_id", False, None, True, ENTITY_ALL, False, False, True, False)
     CURRENT_NUMBER = ("current_number", "current_number", False, None, True, ENTITY_ALL, False, True, True, False)
+    UPDATED_ON = ("updated_on", "updated_on", False, None, True, ENTITY_ALL, False, True, True, False)
+    # Branch: terminals carry branch_id, so one join is enough.
+    BRANCH_ID = ("branch_id", "branch_id", True, "terminal", True, ENTITY_ALL, False, False, False, False)
+    BRANCH_CODE = ("code", "branch_code", True, "terminal.branch", True, ENTITY_ALL, False, False, False, False)
+    TERMINAL_CODE = ("code", "terminal_code", True, "terminal", True, ENTITY_ALL, False, False, False, False)
+    DOCUMENT_TYPE_CODE = ("code", "document_type_code", True, "document_type", True, ENTITY_ALL, False, False, False, False)
     ORDER_BY = (None, "order_by", False, None, False, ENTITY_ALL, False, False, False, False)
 
     def __init__(self, entity_field, json_field, is_join_field, join_field, is_controller_filter,

@@ -9892,6 +9892,160 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "consecutives"
+        ],
+        "summary": "Manually raise a consecutive counter (raise-only, audited)",
+        "operationId": "update_consecutive_number_api_organizations__organization_id__consecutives__consecutive_id__patch",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "consecutive_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Consecutive ID",
+              "title": "Consecutive Id"
+            },
+            "description": "Consecutive ID"
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "User identifier from header",
+              "title": "X-User-Id"
+            },
+            "description": "User identifier from header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsecutiveUpdateRequestDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsecutiveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La solicitud no es válida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticación requerida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks admin:consecutives:update"
+          },
+          "404": {
+            "description": "Consecutive not found in the organization"
+          },
+          "409": {
+            "description": "The requested number does not raise the counter",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "CONSECUTIVE_NOT_RAISED",
+                    "message": "The consecutive can only be raised: requested 40, current is 42",
+                    "current_number": 42
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "La solicitud contiene datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Se excedió el límite de solicitudes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ocurrió un error interno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Un servicio dependiente devolvió un error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "El servicio no está disponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/organizations/{organization_id}/terminals/{terminal_id}/consecutives/{document_type_id}": {
@@ -10322,6 +10476,174 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConsecutiveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "La solicitud no es válida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticación requerida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No tiene permisos para esta operación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso solicitado no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La solicitud entra en conflicto con el estado actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "La solicitud contiene datos inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Se excedió el límite de solicitudes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Ocurrió un error interno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Un servicio dependiente devolvió un error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "El servicio no está disponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/{organization_id}/consecutives/{consecutive_id}/adjustments": {
+      "get": {
+        "tags": [
+          "consecutives"
+        ],
+        "summary": "Audit trail of manual changes to a consecutive, newest first",
+        "operationId": "list_consecutive_adjustments_api_organizations__organization_id__consecutives__consecutive_id__adjustments_get",
+        "parameters": [
+          {
+            "name": "organization_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Organization identifier",
+              "title": "Organization Id"
+            },
+            "description": "Organization identifier"
+          },
+          {
+            "name": "consecutive_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Consecutive ID",
+              "title": "Consecutive Id"
+            },
+            "description": "Consecutive ID"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "User identifier from header",
+              "title": "X-User-Id"
+            },
+            "description": "User identifier from header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsecutiveAdjustmentListResponse"
                 }
               }
             }
@@ -22084,6 +22406,95 @@
         ],
         "title": "ConfirmationResponse"
       },
+      "ConsecutiveAdjustmentListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ConsecutiveAdjustmentResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "ConsecutiveAdjustmentListResponse"
+      },
+      "ConsecutiveAdjustmentResponse": {
+        "properties": {
+          "adjustment_id": {
+            "type": "string",
+            "title": "Adjustment Id"
+          },
+          "consecutive_id": {
+            "type": "string",
+            "title": "Consecutive Id"
+          },
+          "previous_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Number"
+          },
+          "new_number": {
+            "type": "integer",
+            "title": "New Number"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "changed_by": {
+            "type": "string",
+            "title": "Changed By"
+          },
+          "changed_on": {
+            "type": "string",
+            "title": "Changed On"
+          }
+        },
+        "type": "object",
+        "required": [
+          "adjustment_id",
+          "consecutive_id",
+          "new_number",
+          "reason",
+          "changed_by",
+          "changed_on"
+        ],
+        "title": "ConsecutiveAdjustmentResponse",
+        "description": "One audited manual change to a consecutive counter."
+      },
+      "ConsecutiveBranchRef": {
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "title": "Branch Id"
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "branch_id",
+          "code",
+          "name"
+        ],
+        "title": "ConsecutiveBranchRef"
+      },
       "ConsecutiveCreateRequestDTO": {
         "properties": {
           "terminal_id": {
@@ -22098,6 +22509,7 @@
             "anyOf": [
               {
                 "type": "integer",
+                "maximum": 9999999999.0,
                 "minimum": 0.0
               },
               {
@@ -22105,6 +22517,18 @@
               }
             ],
             "title": "Initial Number"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
         "type": "object",
@@ -22113,6 +22537,29 @@
           "document_type_id"
         ],
         "title": "ConsecutiveCreateRequestDTO"
+      },
+      "ConsecutiveDocumentTypeRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "name"
+        ],
+        "title": "ConsecutiveDocumentTypeRef"
       },
       "ConsecutiveListResponse": {
         "properties": {
@@ -22168,6 +22615,47 @@
             ],
             "title": "Document Consecutive"
           },
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsecutiveBranchRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "terminal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsecutiveTerminalRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "document_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsecutiveDocumentTypeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_document_consecutive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Document Consecutive"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -22206,6 +22694,52 @@
         ],
         "title": "ConsecutiveResponse",
         "description": "Consecutive (document sequence counter) response DTO."
+      },
+      "ConsecutiveTerminalRef": {
+        "properties": {
+          "terminal_id": {
+            "type": "string",
+            "title": "Terminal Id"
+          },
+          "code": {
+            "type": "integer",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "terminal_id",
+          "code",
+          "name"
+        ],
+        "title": "ConsecutiveTerminalRef"
+      },
+      "ConsecutiveUpdateRequestDTO": {
+        "properties": {
+          "current_number": {
+            "type": "integer",
+            "maximum": 9999999999.0,
+            "minimum": 1.0,
+            "title": "Current Number"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_number",
+          "reason"
+        ],
+        "title": "ConsecutiveUpdateRequestDTO",
+        "description": "Manual correction of a consecutive counter. Raise-only (see service)."
       },
       "CreateConfirmationDTO": {
         "properties": {

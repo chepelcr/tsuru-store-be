@@ -15,6 +15,9 @@ from app.models.crossdocking_item import CrossDockingItem
 from app.models.branch import Branch
 from app.models.branch_type import BranchType
 from app.models.terminal import Terminal
+from app.models.document_type import DocumentType
+from app.models.consecutive import Consecutive
+from app.models.consecutive_adjustment import ConsecutiveAdjustment
 from app.models.session import Session
 from app.models.assignment import Assignment
 from app.models.closing import Closing
@@ -57,6 +60,9 @@ __all__ = [
     "Branch",
     "BranchType",
     "Terminal",
+    "DocumentType",
+    "Consecutive",
+    "ConsecutiveAdjustment",
     "Session",
     "Assignment",
     "Closing",

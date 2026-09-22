@@ -213,6 +213,11 @@ class SearchUtils:
             return True
         if value.lower() == "false":
             return False
+        # A leading zero means a code, not a number: Hacienda document-type
+        # "01" must not become 1 and then match nothing as the string "1".
+        # Integer columns still get their int back in `_apply_operation`.
+        if len(value) > 1 and value.startswith("0") and value.isdigit():
+            return value
         try:
             return int(value)
         except ValueError:

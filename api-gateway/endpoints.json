@@ -1933,6 +1933,65 @@
           }
         },
         {
+          "path": "/api/organizations/{organization_id}/consecutives/{consecutive_id}",
+          "method": "PATCH",
+          "operation_id": "update_consecutive_number_api_organizations__organization_id__consecutives__consecutive_id__patch",
+          "summary": "Manually raise a consecutive counter (raise-only, audited)",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "consecutive_id",
+              "type": "string",
+              "required": true,
+              "description": "Consecutive ID"
+            }
+          ],
+          "query_params": [],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
+          "path": "/api/organizations/{organization_id}/consecutives/{consecutive_id}/adjustments",
+          "method": "GET",
+          "operation_id": "list_consecutive_adjustments_api_organizations__organization_id__consecutives__consecutive_id__adjustments_get",
+          "summary": "Audit trail of manual changes to a consecutive, newest first",
+          "description": "",
+          "path_params": [
+            {
+              "name": "organization_id",
+              "type": "string",
+              "required": true,
+              "description": "Organization identifier"
+            },
+            {
+              "name": "consecutive_id",
+              "type": "string",
+              "required": true,
+              "description": "Consecutive ID"
+            }
+          ],
+          "query_params": [
+            {
+              "name": "limit",
+              "type": "integer",
+              "required": false,
+              "description": ""
+            }
+          ],
+          "response": {
+            "is_list": false,
+            "fields": []
+          }
+        },
+        {
           "path": "/api/organizations/{organization_id}/consecutives/{consecutive_id}/status",
           "method": "PATCH",
           "operation_id": "update_consecutive_status_api_organizations__organization_id__consecutives__consecutive_id__status_patch",

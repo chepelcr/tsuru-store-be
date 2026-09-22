@@ -5,7 +5,7 @@ from typing import Optional
 
 from sqlalchemy import BigInteger, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
@@ -29,6 +29,13 @@ class Consecutive(Base, TimestampMixin):
     )
     current_number: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # View-only, never loaded: they exist so the search enum can name
+    # `terminal.*` / `document_type.*` join fields (SearchUtils resolves the
+    # target column through the relationship). The list query joins the tables
+    # itself — see ConsecutiveRepository.find_all_paginated.
+    terminal = relationship("Terminal", viewonly=True, lazy="noload")
+    document_type = relationship("DocumentType", viewonly=True, lazy="noload")
 
     __table_args__ = (
         UniqueConstraint(

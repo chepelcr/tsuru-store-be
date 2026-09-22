@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy import UniqueConstraint, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, StatusMixin, TimestampMixin
 
@@ -30,6 +30,9 @@ class Terminal(Base, TimestampMixin, StatusMixin):
     last_seen_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # View-only join target for `terminal.branch.*` search fields; never loaded.
+    branch = relationship("Branch", viewonly=True, lazy="noload")
 
     __table_args__ = (
         Index("idx_terminals_branch", "branch_id"),

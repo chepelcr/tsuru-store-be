@@ -3635,6 +3635,113 @@ Resources:
                 type: aws_proxy
                 requestParameters:
                   integration.request.header.x-user-id: context.authorizer.claims.sub
+            patch:
+              operationId: backend_update_consecutive_number_api_organizations__organization_id__consecutives__consecutive_id__patch
+              summary: Manually raise a consecutive counter (raise-only, audited)
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: consecutive_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
+            options:
+              responses:
+                '200':
+                  description: CORS OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Methods:
+                      schema:
+                        type: string
+                    Access-Control-Allow-Headers:
+                      schema:
+                        type: string
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,x-user-id,Idempotency-Key'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,PATCH,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+          "/api/organizations/{organization_id}/consecutives/{consecutive_id}/adjustments":
+            get:
+              operationId: backend_list_consecutive_adjustments_api_organizations__organization_id__consecutives__consecutive_id__adjustments_get
+              summary: Audit trail of manual changes to a consecutive, newest first
+              parameters:
+                - name: organization_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: consecutive_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: limit
+                  in: query
+                  required: false
+                  schema:
+                    type: integer
+              responses:
+                '200':
+                  description: OK
+                  headers:
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: string
+                '400':
+                  description: Bad Request
+                '404':
+                  description: Not Found
+              security:
+                - CognitoAuthorizer: []
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:cd-backend-${Environment}-lambda/invocations"
+                passthroughBehavior: when_no_match
+                contentHandling: CONVERT_TO_TEXT
+                type: aws_proxy
+                requestParameters:
+                  integration.request.header.x-user-id: context.authorizer.claims.sub
             options:
               responses:
                 '200':
