@@ -1883,6 +1883,13 @@ DOCUMENT_INFO_FIELDS = (
 )
 
 
+#: Hacienda document type of a credit note.
+CREDIT_NOTE_TYPE = "03"
+
+#: What an order keeps of each credit note issued against it.
+CREDIT_NOTE_FIELDS = DOCUMENT_INFO_FIELDS + ("tipo_nota", "referenced_document_key")
+
+
 def find_order(organization_id: str, document_number: str):
     """The order row, or None. Read-only — for callers that need to inspect it
     before deciding what status to answer with (the repair endpoint)."""
@@ -1970,6 +1977,23 @@ def link_order_document(
                 document_number, organization_id, document_id,
             )
             return None
+
+        # A credit note carrying the order number (the early-payment financial
+        # NC, TSR-340) does not bill the order — its invoice does. Record it on
+        # the order's credit notes and leave the billing link alone. Upserted
+        # by document id: the note arrives once per verdict.
+        if (document or {}).get("document_type") == CREDIT_NOTE_TYPE:
+            notes = [n for n in (order.credit_notes or []) if n.get("document_id") != document_id]
+            entry = {key: document[key] for key in CREDIT_NOTE_FIELDS if key in document}
+            entry.setdefault("issued_on", datetime.now(timezone.utc).isoformat())
+            notes.append(entry)
+            order.credit_notes = notes
+            order = repo.save(order)
+            logger.info(
+                "LINK_ORDER_DOCUMENT: credit note %s recorded on order '%s' (status %s)",
+                document_id, document_number, entry.get("status"),
+            )
+            return order_to_response(order)
 
         if order.document_id and order.document_id != document_id:
             # A different document already holds this order — unless that one

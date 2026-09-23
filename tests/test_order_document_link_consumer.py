@@ -258,3 +258,44 @@ class TestLinking:
     def test_a_document_with_no_id_is_a_real_error(self, repo):
         with pytest.raises(ValueError, match="document_id"):
             link_order_document("org-1", "PM-000123", {"document_type": "01"})
+
+
+CREDIT_NOTE = {
+    **DOCUMENT,
+    "document_id": "9f3a0000-0000-0000-0000-0000000000nc",
+    "document_type": "03",
+    "consecutive_number": "00100001030000000009",
+    "total_amount": 5650.0,
+    "tipo_nota": "NCprontopago",
+    "referenced_document_key": DOCUMENT["document_key"],
+}
+
+
+class TestCreditNotes:
+    """The early-payment financial NC carries the order number (TSR-340). It is
+    recorded among the order's credit notes and never takes over the billing."""
+
+    @patch("app.services.order_service.order_to_response", lambda o: o)
+    def test_a_credit_note_is_recorded_without_relinking(self, repo):
+        existing = order(document_id=DOCUMENT["document_id"], document_info={"status": 1})
+        repo.find_by_company_and_document.return_value = existing
+        repo.save.side_effect = lambda o: o
+
+        link_order_document("org-1", "PM-000123", CREDIT_NOTE)
+
+        assert existing.document_id == DOCUMENT["document_id"]
+        assert existing.credit_notes[0]["document_id"] == CREDIT_NOTE["document_id"]
+        assert existing.credit_notes[0]["tipo_nota"] == "NCprontopago"
+        assert is_order_billed(existing)
+
+    @patch("app.services.order_service.order_to_response", lambda o: o)
+    def test_each_verdict_updates_the_same_entry(self, repo):
+        existing = order(document_id=DOCUMENT["document_id"], document_info={"status": 1})
+        repo.find_by_company_and_document.return_value = existing
+        repo.save.side_effect = lambda o: o
+
+        link_order_document("org-1", "PM-000123", {**CREDIT_NOTE, "status": 0})
+        link_order_document("org-1", "PM-000123", {**CREDIT_NOTE, "status": 1})
+
+        assert len(existing.credit_notes) == 1
+        assert existing.credit_notes[0]["status"] == 1

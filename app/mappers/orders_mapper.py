@@ -174,6 +174,7 @@ def order_to_response(order: Order) -> OrderResponse:
         is_quote=(order.order_status == "quote"),
         document_id=order.document_id,
         document_info=order.document_info if order.document_id else None,
+        credit_notes=order.credit_notes or None,
         order_id=order.order_id,
         company_id=order.company_id,
         document_number=order.document_number,

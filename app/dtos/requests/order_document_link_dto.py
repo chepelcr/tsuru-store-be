@@ -35,6 +35,10 @@ class LinkedDocumentDTO(LinkEventDTO):
     status: Optional[int] = None
     total_amount: Optional[float] = None
     currency_code: Optional[str] = Field(None, max_length=10)
+    #: The note kind (hidden OtroTexto TipoNota), e.g. "NCprontopago" — TSR-340.
+    tipo_nota: Optional[str] = Field(None, max_length=50)
+    #: For a credit/debit note: the clave of the document it references.
+    referenced_document_key: Optional[str] = Field(None, max_length=100)
 
 
 class OrderDocumentLinkPayload(LinkEventDTO):

@@ -1,7 +1,7 @@
 """Order DTO - Main order information."""
 """Order DTO - Main order information."""
 
-from typing import Optional
+from typing import List, Optional
 from datetime import date
 
 from pydantic import BaseModel, Field, ConfigDict
@@ -177,6 +177,16 @@ class OrderResponse(BaseModel):
             "(Hacienda verdict), `total_amount`, `currency_code`. Written when "
             "Hacienda accepts the document, not at checkout time, so it is "
             "absent while a document is still being validated."
+        ),
+    )
+
+    credit_notes: Optional[List[dict]] = Field(
+        None,
+        description=(
+            "Credit notes issued against the order's invoice (TSR-340), each "
+            "`document_id`, `document_type`, `consecutive_number`, `document_key`, "
+            "`issued_on`, `status`, `total_amount`, `currency_code`, `tipo_nota` "
+            "(e.g. NCprontopago). They never replace `document_id`."
         ),
     )
 

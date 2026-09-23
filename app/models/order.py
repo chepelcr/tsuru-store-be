@@ -115,6 +115,10 @@ class Order(Base, AuditMixin):
     # checkout. See `services/order_service.link_order_document`.
     document_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     document_info: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    #: Credit notes issued against this order's invoice — e.g. the early-payment
+    #: financial NC (TSR-340). One entry per note document; they never replace
+    #: `document_id`, which keeps pointing at the invoice that bills the order.
+    credit_notes: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
 
     # --- Storefront (anonymous) pedido fields (TSR-118 / W11) --------------
     # A tracked order placed from a public storefront. The customer is a guest
