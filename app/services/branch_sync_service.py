@@ -66,7 +66,7 @@ class BranchSyncService:
                     code=incoming.number,
                     type=default_type,
                     created_by="hacienda-history",
-                    **{**provided, "name": incoming.name or f"Sucursal {incoming.number:03d}"},
+                    **{**provided, "name": incoming.name or f"Sucursal {incoming.number}"},
                 )
                 for incoming_terminal in sorted(incoming.terminals, key=lambda terminal: terminal.number):
                     terminal = terminal_repo.insert_from_history(
