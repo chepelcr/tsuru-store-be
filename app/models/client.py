@@ -60,7 +60,9 @@ class Client(Base, AuditMixin):
         primaryjoin="foreign(Client.phone_country_code) == Country.iso_code",
         viewonly=True,
         uselist=False,
-        lazy="select",
+        # Joined, not lazy: clients are mapped to their response AFTER the
+        # repository session closes, so a lazy load there raises.
+        lazy="joined",
     )
     assets: Mapped[List["ClientAsset"]] = relationship(back_populates="client", cascade="all, delete-orphan")
 
