@@ -28,7 +28,7 @@ Globals:
     Timeout: 60
     MemorySize: 1024
     Architectures:
-      - x86_64
+      - arm64
     Environment:
       Variables:
         STAGE: !FindInMap [EnvironmentMapping, !Ref Environment, ConfigStage]

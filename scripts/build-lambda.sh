@@ -65,7 +65,7 @@ aws.exe ecr get-login-password --region $REGION --profile $PROFILE | docker logi
 
 # Build Docker image
 echo "🔨 Building Docker image..."
-docker buildx build --platform linux/amd64 -t cross-docking-backend-ecr:latest .
+docker buildx build --platform linux/arm64 -t cross-docking-backend-ecr:latest .
 
 # Tag and push Docker image
 echo "📤 Pushing Docker image to ECR..."

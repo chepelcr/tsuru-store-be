@@ -5,7 +5,7 @@ sqlalchemy>=2.0.0
 psycopg[binary]>=3.1.0
 python-dotenv>=1.0.0
 alembic>=1.13.0
-psycopg2-binary
+psycopg2-binary==2.9.9  # last release with a cp39 manylinux2014 aarch64 wheel (arm64 on AL2)
 jinja2>=3.1.0
 pdfkit>=1.0.0
 boto3>=1.34.0

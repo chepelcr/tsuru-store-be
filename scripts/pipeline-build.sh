@@ -24,7 +24,7 @@ aws ecr describe-repositories --repository-names "$ECR_REPO" --region "$REGION" 
 # Build and push — provenance=false required for Lambda image compatibility
 echo "[BUILD] cd-backend → $FULL_URI"
 docker buildx build \
-  --platform linux/amd64 \
+  --platform linux/arm64 \
   --provenance=false \
   --sbom=false \
   --push \
