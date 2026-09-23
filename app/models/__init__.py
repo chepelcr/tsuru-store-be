@@ -2,6 +2,7 @@ from app.models.base import Base, AuditMixin
 from app.models.organization import Organization
 from app.models.category import Category
 from app.models.client import Client
+from app.models.country import Country
 from app.models.store import Store
 from app.models.department import Department
 from app.models.client_asset import ClientAsset
@@ -42,6 +43,7 @@ from app.models.verticals import (
 )
 
 __all__ = [
+    "Country",
     "Base",
     "AuditMixin",
     "Organization",

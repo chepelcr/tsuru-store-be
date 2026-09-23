@@ -26,7 +26,10 @@ target_metadata = Base.metadata
 
 # Only manage tables that belong to THIS app — ignore tables from other projects
 # sharing the same database.
-OUR_TABLES = set(target_metadata.tables.keys())
+# `countries` is a read-only mirror of data-be's catalog (app/models/country.py):
+# mapped so a phone's dialing code resolves from the DB, never migrated here.
+DATA_BE_OWNED_TABLES = {"countries"}
+OUR_TABLES = set(target_metadata.tables.keys()) - DATA_BE_OWNED_TABLES
 
 # Tables shared with BeautyMarket — we only ADD columns/indexes, never drop existing ones.
 SHARED_TABLES = {"organizations", "products", "categories"}
@@ -56,6 +59,9 @@ def include_object(object_, name, type_, reflected, compare_to):
     All other changes (drops, alters, constraint changes) are blocked.
     """
     table_name = _get_table_name(object_)
+    if name in DATA_BE_OWNED_TABLES or table_name in DATA_BE_OWNED_TABLES:
+        # Mapped read-only; data-be owns and migrates it.
+        return False
 
     if table_name in SHARED_TABLES:
         if reflected and compare_to is None:

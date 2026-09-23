@@ -17,7 +17,10 @@ class IdentificationResponse(BaseModel):
 class PhoneResponse(BaseModel):
     model_config = {"from_attributes": True}
     
+    #: ISO numeric country code (188) — the key the form's country select uses.
     country_code: Optional[str] = Field(None)
+    #: Dialing code (506) from the countries catalog — what people read.
+    dial_code: Optional[str] = Field(None)
     area_code: Optional[str] = Field(None)
     number: Optional[str] = Field(None)
     description: Optional[str] = Field(None)

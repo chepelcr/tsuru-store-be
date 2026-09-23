@@ -229,6 +229,8 @@ def _map_client(client: Client) -> ClientResponse:
     if client.phone_number:
         phone = PhoneResponse(
             country_code=client.phone_country_code,
+            dial_code=(client.phone_country.dial_code if client.phone_country
+                       else client.phone_country_code),
             area_code=client.phone_area_code,
             number=client.phone_number,
             description=client.phone_description,

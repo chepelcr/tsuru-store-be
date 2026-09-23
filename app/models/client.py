@@ -53,6 +53,15 @@ class Client(Base, AuditMixin):
     # Relationships
     stores: Mapped[List["Store"]] = relationship(back_populates="client", cascade="all, delete-orphan")
     departments: Mapped[List["Department"]] = relationship(back_populates="client", cascade="all, delete-orphan")
+    # The phone's country from data-be's catalog (no FK across services), so the
+    # dialing code comes from the DB rather than from each client's lookup.
+    phone_country: Mapped[Optional["Country"]] = relationship(
+        "Country",
+        primaryjoin="foreign(Client.phone_country_code) == Country.iso_code",
+        viewonly=True,
+        uselist=False,
+        lazy="select",
+    )
     assets: Mapped[List["ClientAsset"]] = relationship(back_populates="client", cascade="all, delete-orphan")
 
     __table_args__ = (
