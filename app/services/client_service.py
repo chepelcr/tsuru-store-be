@@ -231,6 +231,7 @@ def _map_client(client: Client) -> ClientResponse:
             country_code=client.phone_country_code,
             dial_code=(client.phone_country.dial_code if client.phone_country
                        else client.phone_country_code),
+            dial_area=client.phone_country.dial_area if client.phone_country else None,
             area_code=client.phone_area_code,
             number=client.phone_number,
             description=client.phone_description,

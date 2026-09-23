@@ -5,7 +5,7 @@ from typing import Optional
 
 from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, StatusMixin, TimestampMixin
 
@@ -28,8 +28,19 @@ class Branch(Base, TimestampMixin, StatusMixin):
     neighborhood_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
-    # Contact
-    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    # Contact — structured like a client phone: the ISO numeric country (188,
+    # a key into data-be's countries catalog) and the digits. The dialing code
+    # (+506) is read from the catalog, never stored.
+    phone_country_code: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    phone_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    phone_country: Mapped[Optional["Country"]] = relationship(  # noqa: F821
+        "Country",
+        primaryjoin="foreign(Branch.phone_country_code) == Country.iso_code",
+        viewonly=True,
+        uselist=False,
+        # Joined: branches are mapped after their repository session closes.
+        lazy="joined",
+    )
     
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
 

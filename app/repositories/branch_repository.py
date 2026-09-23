@@ -19,16 +19,29 @@ class BranchRepository(DatabaseConnection):
     def __init__(self):
         super().__init__()
 
-    def insert_from_history(self, **values) -> Branch:
-        """Insert a discovered branch without overwriting operator-owned fields.
+    def insert_from_history(self, updates: Optional[Dict] = None, **values) -> Branch:
+        """Insert a discovered branch, or fill an existing one with what Hacienda sent.
+
+        ``values`` is the full row for a NEW branch (defaults included);
+        ``updates`` holds only the fields the event actually carried, and those
+        overwrite an existing branch — the default branch 001 created at
+        registration, or one an operator added — so its address and phone come
+        from Hacienda once the history arrives. A field the event did not carry
+        is never touched, which is what keeps a re-delivered default-station
+        event (no name, no address) from wiping anything.
 
         ON CONFLICT also handles concurrent deliveries and HTTP branch creation;
         the following SELECT sees the winner after the insert has waited for it.
         Codes remain integers; Hacienda formats them to three digits at issuance.
         """
-        stmt = insert(Branch).values(**values).on_conflict_do_nothing(
-            index_elements=[Branch.organization_id, Branch.code],
-        )
+        stmt = insert(Branch).values(**values)
+        if updates:
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[Branch.organization_id, Branch.code],
+                set_={**updates, "updated_on": func.now()},
+            )
+        else:
+            stmt = stmt.on_conflict_do_nothing(index_elements=[Branch.organization_id, Branch.code])
         self.session.execute(stmt)
         return self.find_by_code_and_organization(values["code"], values["organization_id"])
 

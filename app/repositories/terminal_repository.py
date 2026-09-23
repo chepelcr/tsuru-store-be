@@ -19,8 +19,12 @@ class TerminalRepository(DatabaseConnection):
     def __init__(self):
         super().__init__()
 
-    def insert_from_history(self, **values) -> Terminal:
-        """Insert a discovered terminal without overwriting operator-owned fields.
+    def insert_from_history(self, updates: Optional[Dict] = None, **values) -> Terminal:
+        """Insert a discovered terminal, or rename an existing one when Hacienda sent a name.
+
+        ``updates`` carries only what the event provided (see
+        ``BranchRepository.insert_from_history``); without it an existing
+        terminal is left as it is.
 
         The conflict target is (organization_id, branch_id, code): Hacienda
         numbers terminals within a branch, so the same code under a different
@@ -30,9 +34,12 @@ class TerminalRepository(DatabaseConnection):
         with branch 1/terminal 1 and branch 14/terminal 1 could never have its
         branches discovered at all (TSR-254, migration c2d3e4f5a6b7).
         """
-        stmt = insert(Terminal).values(**values).on_conflict_do_nothing(
-            index_elements=[Terminal.organization_id, Terminal.branch_id, Terminal.code],
-        )
+        stmt = insert(Terminal).values(**values)
+        conflict = [Terminal.organization_id, Terminal.branch_id, Terminal.code]
+        if updates:
+            stmt = stmt.on_conflict_do_update(index_elements=conflict, set_={**updates, "updated_on": func.now()})
+        else:
+            stmt = stmt.on_conflict_do_nothing(index_elements=conflict)
         self.session.execute(stmt)
         return self.find_by_code_and_branch(
             values["code"], str(values["branch_id"]), values["organization_id"],

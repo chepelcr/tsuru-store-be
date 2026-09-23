@@ -10,6 +10,7 @@ from app.dtos.requests.branch_request_dto import (
     BranchUpdateRequestDTO,
 )
 from app.dtos.responses.branch_dto import BranchListResponse, BranchResponse, LocationResponse
+from app.dtos.responses.client_dto import PhoneResponse
 from app.dtos.responses.pagination_dto import PaginationResponse
 from app.dtos.responses.terminal_dto import TerminalResponse
 from app.enums.branch_search_filters import BranchSearchFilters
@@ -137,7 +138,8 @@ def create_branch(
             district_id=loc.district_id if loc else None,
             neighborhood_id=loc.neighborhood_id if loc else None,
             address=loc.address if loc else None,
-            phone=dto.phone,
+            phone_country_code=dto.phone.country_code if dto.phone else None,
+            phone_number=dto.phone.number if dto.phone else None,
             created_by=user_id,
         )
         branch = repo.save(branch)
@@ -186,7 +188,8 @@ def update_branch(
             if loc.address is not None:
                 branch.address = loc.address
         if dto.phone is not None:
-            branch.phone = dto.phone
+            branch.phone_country_code = dto.phone.country_code
+            branch.phone_number = dto.phone.number
 
         branch = repo.save(branch)
 
@@ -274,7 +277,13 @@ def _map_branch(
         type=branch.type,
         status=branch.status,
         location=location,
-        phone=branch.phone,
+        phone=PhoneResponse(
+            country_code=branch.phone_country_code,
+            dial_code=(branch.phone_country.dial_code if branch.phone_country
+                       else branch.phone_country_code),
+            dial_area=branch.phone_country.dial_area if branch.phone_country else None,
+            number=branch.phone_number,
+        ) if branch.phone_number else None,
         created_at=branch.created_on.isoformat() if branch.created_on else None,
         updated_at=branch.updated_on.isoformat() if branch.updated_on else None,
         created_by=branch.created_by,

@@ -31,6 +31,15 @@ class Country(Base):
 
     @property
     def dial_code(self) -> Optional[str]:
-        """Bare digits (``506``), the same shape sales-be sends as ``CodigoPais``."""
-        digits = "".join(ch for ch in (self.phone_code or "") if ch.isdigit())
+        """The country part, bare digits: ``+506`` → ``506``, ``+1-869`` → ``1``.
+
+        Same split sales-be sends as ``CodigoPais`` (max three digits).
+        """
+        digits = "".join(ch for ch in (self.phone_code or "").partition("-")[0] if ch.isdigit())
+        return digits or None
+
+    @property
+    def dial_area(self) -> Optional[str]:
+        """The area code the catalog writes after the dash (``+1-869`` → ``869``)."""
+        digits = "".join(ch for ch in (self.phone_code or "").partition("-")[2] if ch.isdigit())
         return digits or None

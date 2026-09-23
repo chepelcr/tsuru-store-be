@@ -7,6 +7,27 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.dtos.common.location_dto import LocationRequestDTO
 
 
+class BranchPhoneRequestDTO(BaseModel):
+    """A branch phone, shaped like a client phone.
+
+    ``country_code`` is the ISO numeric code (188) from the countries catalog —
+    the dialing code (+506) is resolved on read, never sent or stored.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    country_code: str = Field("188", pattern=r"^[0-9]{1,3}$")
+    number: str = Field(..., min_length=1, max_length=20)
+
+    @field_validator("number")
+    @classmethod
+    def digits_only(cls, v: str) -> str:
+        digits = "".join(ch for ch in v if ch.isdigit())
+        if not digits:
+            raise ValueError("number must contain digits")
+        return digits
+
+
 class BranchCreateRequestDTO(BaseModel):
     """Request DTO for creating a branch with snake_case fields."""
 
@@ -20,7 +41,7 @@ class BranchCreateRequestDTO(BaseModel):
     # org's own first branch type) un-saveable through this same API.
     type: str = Field(..., min_length=1, max_length=50)
     location: Optional[LocationRequestDTO] = Field(None)
-    phone: Optional[str] = Field(None, max_length=50)
+    phone: Optional[BranchPhoneRequestDTO] = Field(None)
 
     @field_validator("name")
     @classmethod
@@ -40,7 +61,7 @@ class BranchUpdateRequestDTO(BaseModel):
     type: Optional[str] = Field(None, min_length=1, max_length=50)
     is_active: Optional[bool] = Field(None)
     location: Optional[LocationRequestDTO] = Field(None)
-    phone: Optional[str] = Field(None, max_length=50)
+    phone: Optional[BranchPhoneRequestDTO] = Field(None)
 
     @field_validator("name")
     @classmethod

@@ -21,6 +21,7 @@ import pytest
 
 from app.dtos.common.location_dto import LocationRequestDTO
 from app.dtos.requests.branch_request_dto import (
+    BranchPhoneRequestDTO,
     BranchCreateRequestDTO,
     BranchUpdateRequestDTO,
 )
@@ -46,7 +47,8 @@ def make_branch(**overrides) -> Branch:
         district_id=1,
         neighborhood_id=4,
         address="Estadio Lito Pérez",
-        phone="1234-5678",
+        phone_country_code="188",
+        phone_number="12345678",
         created_by=USER_ID,
     )
     values.update(overrides)
@@ -153,7 +155,7 @@ class TestCreateBranch:
         dto = BranchCreateRequestDTO(
             name="Puesto 2", code=2, type="stand",
             location=LocationRequestDTO(state_id=6, county_id=1, district_id=1, address="x"),
-            phone="8888-8888",
+            phone=BranchPhoneRequestDTO(country_code="188", number="8888-8888"),
         )
         result = branch_service.create_branch(ORG_ID, USER_ID, dto)
 
@@ -190,7 +192,7 @@ class TestCreateBranch:
 
 class TestUpdateBranch:
     def test_updates_only_the_fields_supplied(self, branch_repo):
-        branch = make_branch(name="Antes", phone="1111-1111")
+        branch = make_branch(name="Antes", phone_number="11111111")
         branch_repo.find_by_code_and_organization.return_value = branch
         branch_repo.save.side_effect = saved
 
@@ -199,7 +201,8 @@ class TestUpdateBranch:
         )
 
         assert result.name == "Después"
-        assert result.phone == "1111-1111", "an omitted field must not be cleared"
+        assert result.phone.number == "11111111", "an omitted field must not be cleared"
+        assert result.phone.country_code == "188"
 
     def test_unknown_code_returns_none(self, branch_repo):
         branch_repo.find_by_code_and_organization.return_value = None

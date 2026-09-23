@@ -5,6 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from app.dtos.common.location_dto import LocationResponse
+from app.dtos.responses.client_dto import PhoneResponse
 from app.dtos.responses.pagination_dto import PaginationResponse
 
 
@@ -18,7 +19,9 @@ class BranchResponse(BaseModel):
     type: str  # 'stand' | 'restaurant'
     status: int  # 1=Active 2=Inactive 3=Deleted
     location: Optional[LocationResponse] = None
-    phone: Optional[str] = None
+    # Same shape as a client phone: ISO country_code (188) + dial_code (506,
+    # from the countries catalog) + number.
+    phone: Optional[PhoneResponse] = None
     created_at: Optional[str] = None  # ISO timestamp
     updated_at: Optional[str] = None  # ISO timestamp
     created_by: str  # user_id

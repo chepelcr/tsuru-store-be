@@ -21,6 +21,8 @@ class PhoneResponse(BaseModel):
     country_code: Optional[str] = Field(None)
     #: Dialing code (506) from the countries catalog — what people read.
     dial_code: Optional[str] = Field(None)
+    #: Area code after the catalog's dash (``+1-869`` → ``869``), else None.
+    dial_area: Optional[str] = Field(None)
     area_code: Optional[str] = Field(None)
     number: Optional[str] = Field(None)
     description: Optional[str] = Field(None)
