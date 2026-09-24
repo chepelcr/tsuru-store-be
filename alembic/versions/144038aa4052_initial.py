@@ -235,7 +235,8 @@ def upgrade() -> None:
     op.add_column('categories', sa.Column('image_2_url', sa.Text(), nullable=True))
     op.add_column('organizations', sa.Column('gln', sa.String(length=50), nullable=True))
     op.add_column('organizations', sa.Column('internal_code', sa.String(length=50), nullable=True))
-    op.add_column('organizations', sa.Column('logo_url', sa.String(length=500), nullable=True))
+    # management-be may already have provisioned the shared organization logo.
+    op.execute('ALTER TABLE organizations ADD COLUMN IF NOT EXISTS logo_url VARCHAR(500)')
     # ### end Alembic commands ###
 
 
