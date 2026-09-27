@@ -23,6 +23,7 @@ from app.models.order import Order
 from app.repositories.confirmation_repository import ConfirmationRepository
 from app.repositories.order_repository import OrderRepository
 from app.utils.order_dates import as_date, as_display
+from app.utils.order_files import order_file_prefix
 from app.services import order_service
 from app.configuration.app_config import AppConfig
 from app.services.email_service import _extract_provider_number, send_delivery_email
@@ -182,10 +183,9 @@ def _send_confirmation_email(confirmation: Confirmation, orders: list[Order]) ->
     attachments: list[dict] = []
     for order in orders:
         if order.nuevo_reporte_url:
-            last4 = (order.document_number or "")[-4:]
             attachments.append({
                 "url": order.nuevo_reporte_url,
-                "filename": f"{last4}-RN.xlsx",
+                "filename": f"{order_file_prefix(order)}-RN.xlsx",
             })
 
     if not attachments:

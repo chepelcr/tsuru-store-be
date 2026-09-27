@@ -26,6 +26,7 @@ from app.dtos.responses.storefront_order_dto import StorefrontOrderCreatedRespon
 from app.enums.hacienda_codes import DiscountType, ProductCodeType, TaxType
 from app.services.order_excel_dates import rewrite_delivery_date
 from app.utils.order_dates import as_date
+from app.utils.order_files import file_prefix, order_file_prefix
 from app.utils.product_fiscal_defaults import repair_tax_rows
 from app.enums.order_status import ORDER_STATUS_CODES, OrderStatus, can_transition
 from app.enums.report_color import ReportColorScheme, get_color_palette
@@ -185,8 +186,8 @@ def process_order_excel(organization_id: str, body: ExcelDTO) -> OrderResponse:
 
         # Upload original Excel to S3
         try:
-            last4 = (parsed.document_number or "")[-4:]
-            excel_key = _s3_key(organization_id, parsed.document_number, f"{last4}-DT.xlsx")
+            prefix = file_prefix(parsed.document_number, client)
+            excel_key = _s3_key(organization_id, parsed.document_number, f"{prefix}-DT.xlsx")
             order.excel_url = upload_file_to_s3(excel_bytes, excel_key, EXCEL_CONTENT_TYPE)
         except Exception as e:
             logger.warning(f"Excel upload failed for order {order.document_number}: {e}")
@@ -244,8 +245,8 @@ def process_crossdocking_excel(
 
         # Upload original crossdocking Excel to S3
         try:
-            last4 = (document_number or "")[-4:]
-            cd_key = _s3_key(organization_id, document_number, f"{last4}-CD.xlsx")
+            prefix = order_file_prefix(order)
+            cd_key = _s3_key(organization_id, document_number, f"{prefix}-CD.xlsx")
             order.crossdocking_excel_url = upload_file_to_s3(cd_bytes, cd_key, EXCEL_CONTENT_TYPE)
         except Exception as e:
             logger.warning(f"Crossdocking Excel upload failed: {e}")

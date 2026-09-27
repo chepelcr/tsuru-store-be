@@ -8,6 +8,7 @@ import pdfkit
 from jinja2 import Environment, FileSystemLoader
 
 from app.utils.order_dates import as_display
+from app.utils.order_files import order_file_prefix
 from app.configuration.app_config import AppConfig
 from app.enums.report_color import get_color_palette
 from app.models.order import Order
@@ -201,8 +202,8 @@ def create_order_pdf(order: Order) -> str:
         header_left=datetime.now().strftime("%d/%m/%Y"),
         header_center="Orden de Compra",
     )
-    last4 = (order.document_number or "")[-4:]
-    key = _s3_key(order.company_id, order.document_number, f"{last4}-OC.pdf")
+    prefix = order_file_prefix(order)
+    key = _s3_key(order.company_id, order.document_number, f"{prefix}-OC.pdf")
     return upload_file_to_s3(pdf_bytes, key)
 
 
@@ -312,6 +313,6 @@ def create_crossdocking_pdf(order: Order, crossdocking_data, color=None) -> str:
         header_left=datetime.now().strftime("%d/%m/%Y"),
         header_center="Hoja de distribución",
     )
-    last4 = (order.document_number or "")[-4:]
-    key = _s3_key(order.company_id, order.document_number, f"{last4}.pdf")
+    prefix = order_file_prefix(order)
+    key = _s3_key(order.company_id, order.document_number, f"{prefix}.pdf")
     return upload_file_to_s3(pdf_bytes, key)

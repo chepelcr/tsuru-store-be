@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.utils.order_dates import as_display
+from app.utils.order_files import order_file_prefix
 from app.configuration.app_config import AppConfig
 from app.models.order import Order
 from app.services.pdf_service import (
@@ -199,6 +200,6 @@ def create_order_ticket(order: Order) -> str:
     """
     html = render_ticket_html(order)
     pdf_bytes = _ticket_pdf(html)
-    last4 = (order.document_number or "")[-4:]
-    key = _s3_key(order.company_id, order.document_number, f"{last4}-TICKET.pdf")
+    prefix = order_file_prefix(order)
+    key = _s3_key(order.company_id, order.document_number, f"{prefix}-TICKET.pdf")
     return upload_file_to_s3(pdf_bytes, key)

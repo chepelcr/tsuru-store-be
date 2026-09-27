@@ -47,7 +47,7 @@ def order_to_response(order: Order) -> OrderResponse:
                 # A manual line is not always a catalog product, so its own
                 # description wins over the product's.
                 description=(ln.description or (p.description if p else "") or ""),
-                units_per_box=(p.units_per_box if p else 0) or 0,
+                units_per_box=(p.units_per_box if p else 0) or 1,
                 quantity_ordered=ln.quantity_ordered or 0,
                 units_ordered=ln.units_ordered or 0,
                 unit_price=float(ln.unit_price or 0),
@@ -257,7 +257,7 @@ def build_crossdocking_data(order: Order) -> CrossDockingData:
                     # indentation on these lines came from the same paste.
                     description=(p.description if p else "") or "",
                     quantity=it.quantity or 0,
-                    units_per_box=(p.units_per_box if p else 0) or 0,
+                    units_per_box=(p.units_per_box if p else 0) or 1,
                     total_units=it.total_units or 0,
                     sent=it.sent or 0,
                     missing=it.missing or 0,

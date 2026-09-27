@@ -7,6 +7,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from app.enums.report_color import get_color_palette
 from app.models.order import Order
 from app.services.pdf_service import _s3_key, upload_file_to_s3
+from app.utils.order_files import order_file_prefix
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +89,8 @@ def generate_nuevo_reporte(order: Order, crossdocking_data, color=None) -> bytes
 def create_nuevo_reporte(order: Order, crossdocking_data, color=None) -> str:
     """Generate NuevoReporte Excel and upload to S3."""
     excel_bytes = generate_nuevo_reporte(order, crossdocking_data, color)
-    last4 = (order.document_number or "")[-4:]
-    key = _s3_key(order.company_id, order.document_number, f"{last4}-RN.xlsx")
+    prefix = order_file_prefix(order)
+    key = _s3_key(order.company_id, order.document_number, f"{prefix}-RN.xlsx")
     url = upload_file_to_s3(
         excel_bytes,
         key,
