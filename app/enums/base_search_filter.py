@@ -7,11 +7,8 @@ should inherit from, ensuring consistent behavior and interface.
 
 from __future__ import annotations
 
-import re
 from enum import Enum
 from typing import Optional, Set
-
-_CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
 
 class BaseSearchFilter(Enum):
@@ -133,11 +130,8 @@ class BaseSearchFilter(Enum):
             >>> ProductSearchFilters.get_filter_by_json_field("name")
             <ProductSearchFilters.NAME: ...>
         """
-        # Wire fields are snake_case. A camelCase name (`clientName`) is read as
-        # its snake_case twin so an older client keeps filtering instead of
-        # having its clause silently dropped; new callers must send snake_case.
-        snake = _CAMEL_BOUNDARY.sub("_", json_field).lower() if json_field else json_field
+        # Wire fields are snake_case only; a camelCase name does not resolve.
         for filter_enum in cls:
-            if filter_enum.json_field and filter_enum.json_field in (json_field, snake):
+            if filter_enum.json_field and filter_enum.json_field == json_field:
                 return filter_enum
         return None

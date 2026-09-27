@@ -18,12 +18,6 @@ def test_every_order_filter_is_snake_case():
         assert member.json_field == member.json_field.lower(), member
 
 
-@pytest.mark.parametrize("legacy,snake", [
-    ("clientName", "client_name"),
-    ("documentNumber", "document_number"),
-    ("deliverToCode", "deliver_to_code"),
-])
-def test_legacy_camel_case_still_resolves(legacy, snake):
-    # An older client keeps filtering until it is redeployed.
-    assert SearchFilters.get_filter_by_json_field(legacy) is SearchFilters.get_filter_by_json_field(snake)
-    assert SearchFilters.get_filter_by_json_field(snake) is not None
+@pytest.mark.parametrize("legacy", ["clientName", "documentNumber", "orderStatus"])
+def test_camel_case_is_not_accepted(legacy):
+    assert SearchFilters.get_filter_by_json_field(legacy) is None
