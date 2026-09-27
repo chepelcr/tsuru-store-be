@@ -24,22 +24,22 @@ class ClientsController:
             description="""Get a paginated list of clients with optional search filters.
 
 **Search filters**
-- `clientName`: Client name (supports wildcards)
-- `clientGln`: Client GLN code
+- `client_name`: Client name (supports wildcards)
+- `client_gln`: Client GLN code
 - `status`: Client status (0=Pending, 1=Active, 2=Inactive, 3=Deleted)
 - `nationality`: Client nationality code (e.g., CR, US)
-- `idNumber`: Identification number
+- `id_number`: Identification number
 
 **Sorting**
 - `orderBy>field` (Ascending)
 - `orderBy<field` (Descending)
-- Sortable fields: `clientName`, `clientGln`, `status`, `nationality`, `createdOn`, `updatedOn`
+- Sortable fields: `client_name`, `client_gln`, `status`, `nationality`, `created_on`, `updated_on`
 
 **Examples:**
-- Search by name: `clientName:*corp*`
+- Search by name: `client_name:*corp*`
 - Search pending clients: `status:0`
-- Search by nationality and ID: `nationality:CR,idNumber:123456789`
-- Combined: `status:0,nationality:CR,orderBy>clientName`
+- Search by nationality and ID: `nationality:CR,id_number:123456789`
+- Combined: `status:0,nationality:CR,orderBy>client_name`
 """,
         )
         async def list_clients(
@@ -49,7 +49,7 @@ class ClientsController:
                 description=(
                     "Search filter string. Syntax: field:value,field2:value2. "
                     "Supports operators: : (equal), ! (not equal), > (greater), < (less), ~ (like). "
-                    "Example: clientName:*Test*,orderBy>clientName"
+                    "Example: client_name:*Test*,orderBy>client_name"
                 ),
             ),
             page: int = Query(1, ge=1, description="Page number (1-indexed)"),

@@ -361,19 +361,19 @@ finished by hand.
 - `~` = Like (contains)
 
 **Between (BETWEEN)**
-- `field:value1~value2` = Between values (e.g. `deliveryDate:01/02/2025~28/02/2025`)
+- `field:value1~value2` = Between values (e.g. `delivery_date:2025-02-01~2025-02-28`)
 - `field!value1~value2` = Not between values
 
 **Search filters**
-- `documentNumber`: Document number (supports wildcards)
-- `clientName`: Client name (supports wildcards)
-- `supplierName`: Supplier name (supports wildcards)
-- `deliveryDate`: Delivery date — dd/mm/yyyy (supports between)
-- `creationDate`: Creation date — dd/mm/yyyy (supports between)
-- `orderStatus`: Order status (pending, processing, shipped, delivered, cancelled)
-- `deliverToCode`: Delivery place code
-- `deliverToName`: Delivery place name (supports wildcards)
-- `confirmationNumber`: Confirmation number (supports wildcards)
+- `document_number`: Document number (supports wildcards)
+- `client_name`: Client name (supports wildcards)
+- `supplier_name`: Supplier name (supports wildcards)
+- `delivery_date`: Delivery date — YYYY-MM-DD (supports between)
+- `creation_date`: Creation date — YYYY-MM-DD (supports between)
+- `order_status`: Order status (pending, processing, shipped, delivered, cancelled)
+- `deliver_to_code`: Delivery place code
+- `deliver_to_name`: Delivery place name (supports wildcards)
+- `confirmation_number`: Confirmation number (supports wildcards)
 
 **Separators**
 Filters are individual conditions separated by commas (,).
@@ -382,24 +382,24 @@ Logical AND and OR conditions can be applied:
 - OR: To apply OR conditions, group them inside parentheses
 
 **Examples**
-- `clientName:*corp*,orderStatus:pending` → Orders where client name contains "corp" **and** status is pending
-- `(orderStatus:pending,orderStatus:processing)` → Orders with status pending **or** processing
-- `clientName:*test*,(orderStatus:pending,orderStatus:shipped)` → Client name contains "test" **and** (status pending **or** shipped)
-- `deliveryDate:01/02/2025~28/02/2025` → Orders with delivery date between Feb 1 and Feb 28
+- `client_name:*corp*,order_status:pending` → Orders where client name contains "corp" **and** status is pending
+- `(order_status:pending,order_status:processing)` → Orders with status pending **or** processing
+- `client_name:*test*,(order_status:pending,order_status:shipped)` → Client name contains "test" **and** (status pending **or** shipped)
+- `delivery_date:2025-02-01~2025-02-28` → Orders with delivery date between Feb 1 and Feb 28
 
 **Wildcards**
-- `*ana*` = Contains (e.g. `clientName:*ana*` → Ariana, Melania)
-- `Al*` = Starts with (e.g. `clientName:Al*` → Alberto, Alana)
-- `*el` = Ends with (e.g. `clientName:*el` → Daniel, Miguel)
+- `*ana*` = Contains (e.g. `client_name:*ana*` → Ariana, Melania)
+- `Al*` = Starts with (e.g. `client_name:Al*` → Alberto, Alana)
+- `*el` = Ends with (e.g. `client_name:*el` → Daniel, Miguel)
 
-**Note:** Fields that support wildcards (`documentNumber`, `clientName`, `supplierName`, `deliverToName`, `confirmationNumber`) automatically apply case-insensitive contains matching even without `*` wildcards.
+**Note:** Fields that support wildcards (`document_number`, `client_name`, `supplier_name`, `deliver_to_name`, `confirmation_number`) automatically apply case-insensitive contains matching even without `*` wildcards.
 
 **Sorting**
 - `orderBy>field` (Ascending)
 - `orderBy<field` (Descending)
-- Sortable fields: `documentNumber`, `clientName`, `supplierName`, `deliveryDate`, `creationDate`, `orderStatus`, `createdOn`, `updatedOn`
+- Sortable fields: `document_number`, `client_name`, `supplier_name`, `delivery_date`, `creation_date`, `order_status`, `created_on`, `updated_on`
 
-**Example with sorting:** `orderStatus:pending,orderBy>deliveryDate`
+**Example with sorting:** `order_status:pending,orderBy>delivery_date`
 """,
         )
         async def get_orders(
@@ -409,9 +409,9 @@ Logical AND and OR conditions can be applied:
                 description=(
                     "Search filter string. Syntax: field:value,field2:value2. "
                     "Supports operators: : (equal), ! (not equal), > (greater), < (less), ~ (like). "
-                    "Use () for OR grouping. Example: clientName:*Test*,orderStatus:pending,orderBy>deliveryDate"
+                    "Use () for OR grouping. Example: client_name:*Test*,order_status:pending,orderBy>delivery_date"
                 ),
-                examples=["orderStatus:pending,orderBy>deliveryDate"],
+                examples=["order_status:pending,orderBy>delivery_date"],
             ),
             page: int = Query(1, ge=1, description="Page number (1-indexed)"),
             page_size: int = Query(12, ge=1, le=100, description="Items per page"),
