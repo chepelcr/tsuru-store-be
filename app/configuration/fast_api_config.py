@@ -1,8 +1,8 @@
 from fastapi import FastAPI
+from app.configuration.cors_config import configure_cors
 from app.middleware.user_id_middleware import UserIdMiddleware
 from app.configuration.observability_events import install_observability_events
 from app.error_contract import ERROR_RESPONSES, install_error_handlers
-from starlette.middleware.cors import CORSMiddleware
 
 from app.controllers.assignments_controller import AssignmentsController
 from app.controllers.branch_types_controller import BranchTypesController
@@ -67,18 +67,7 @@ class FastApiConfig:
         return app
 
     def _configure_cors(self):
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*", "https://uploads.tsuru.jcampos.dev"],
-            # First-party FE surfaces (POS, dashboard, landing, template examples,
-            # provisioned org storefronts) must stay allowed even if the wildcard
-            # above is ever narrowed.
-            allow_origin_regex=r"^https://([a-z0-9-]+\.)*jcampos\.dev$",
-            allow_credentials=False,
-            allow_methods=["*"],
-            allow_headers=["*"],
-            max_age=600,
-        )
+        configure_cors(self.app)
 
     def get_app(self) -> FastAPI:
         return self.app
