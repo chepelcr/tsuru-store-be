@@ -25,8 +25,8 @@ set -e
 #
 # Example:
 #   ./deploys/deploy-params.sh dev \
-#     --s3-bucket jmarkets-uploads-jcampos-dev \
-#     --pdf-domain https://jmarkets-uploads.jcampos.dev \
+#     --s3-bucket tsuru-uploads-jcampos-dev \
+#     --pdf-domain https://tsuru-uploads.jcampos.dev \
 #     --email-sender entregas@modaslaura.net \
 #     --email-recipient camdistribucin73@wal-mart.com \
 #     --api-services-url https://private-api.dev.jcampos.io \
