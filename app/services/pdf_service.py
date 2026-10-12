@@ -1,7 +1,10 @@
+import base64
 import logging
+import mimetypes
 import os
 import uuid
 from datetime import datetime
+from urllib.parse import urlparse
 
 import boto3
 import pdfkit
@@ -35,6 +38,26 @@ _jinja_env = Environment(
 _jinja_env.filters["format_currency"] = _format_currency
 
 
+def _document_logo_source(logo_url: str | None) -> str:
+    """Inline platform-hosted logos so Qt does not need to fetch them over HTTPS."""
+    if not logo_url:
+        return ""
+
+    pdf_domain = (AppConfig.get_key("pdf.domain", "") or "").rstrip("/")
+    content_type = mimetypes.guess_type(urlparse(logo_url).path)[0]
+    if not pdf_domain or not logo_url.startswith(pdf_domain + "/") or content_type not in {
+        "image/png", "image/jpeg", "image/gif", "image/svg+xml",
+    }:
+        return logo_url
+
+    try:
+        image_bytes = download_from_s3(logo_url)
+        return f"data:{content_type};base64,{base64.b64encode(image_bytes).decode('ascii')}"
+    except Exception:
+        logger.warning("Could not inline the organization logo for its PDF", exc_info=True)
+        return logo_url
+
+
 def render_order_html(order: Order) -> str:
     lines_data = order.lines or []
     total_units_ordered = sum(ln.units_ordered or 0 for ln in lines_data)
@@ -66,7 +89,7 @@ def render_order_html(order: Order) -> str:
     # Use relationship data
     org = order.organization
     supplier_name = (org.name if org else "") or ""
-    supplier_logo_url = (org.logo_url if org else "") or ""
+    supplier_logo_url = _document_logo_source(org.logo_url if org else None)
     client_name = (order.client.client_name if order.client else "") or ""
     client_gln = (order.client.client_gln if order.client else "") or ""
 
@@ -270,6 +293,7 @@ def render_crossdocking_html(order: Order, crossdocking_data, color=None) -> str
         "deliver_to": deliver_to,
         "deliver_to_gln": deliver_to_gln,
         "supplier_name": supplier_name,
+        "supplier_logo_url": _document_logo_source(org.logo_url if org else None),
         "supplier_internal_code": supplier_internal_code,
         "document_number": order.document_number or "",
         "confirmation": order.confirmation_number or order.bgm011 or "",

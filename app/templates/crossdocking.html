@@ -19,6 +19,15 @@
         .page-break { page-break-after: always; }
         .avoid-break { page-break-inside: avoid; }
 
+        .supplier-logo {
+            display: block;
+            max-width: 180px;
+            max-height: 72px;
+            width: auto;
+            height: auto;
+            margin: 0 auto 10px;
+        }
+
         /* Color palette */
         .hdr-dark { background: {{ colors.hdr_dark }} !important; color: #fff !important; }
         .hdr-dark th, .hdr-dark td { color: #fff !important; }
@@ -164,6 +173,9 @@
 <!-- SECTION 1: DISTRIBUCIÓN POR PUNTO DE VENTA                   -->
 <!-- ============================================================ -->
 <div>
+    {% if supplier_logo_url %}
+    <img class="supplier-logo" src="{{ supplier_logo_url | e }}" alt="{{ supplier_name | e }}">
+    {% endif %}
     <h3>CENTRO DE DISTRIBUCION {{ deliver_to }}</h3>
     <h4>DISTRIBUCIÓN POR PUNTO DE VENTA</h4>
 

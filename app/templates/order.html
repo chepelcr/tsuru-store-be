@@ -39,6 +39,18 @@
             width: 90px;
         }
 
+        .header-logo-cell.has-logo {
+            width: 190px;
+        }
+
+        .supplier-logo {
+            display: block;
+            max-width: 180px;
+            max-height: 80px;
+            width: auto;
+            height: auto;
+        }
+
         .logo {
             width: 80px;
             height: 80px;
@@ -151,9 +163,9 @@
 <body>
     <table class="header-table">
         <tr>
-            <td class="header-logo-cell">
+            <td class="header-logo-cell{% if supplier_logo_url %} has-logo{% endif %}">
                 {% if supplier_logo_url %}
-                <img src="{{ supplier_logo_url }}" style="width:80px; height:80px; object-fit:contain;">
+                <img class="supplier-logo" src="{{ supplier_logo_url | e }}" alt="{{ supplier_name | e }}">
                 {% else %}
                 <div class="logo">LOGO</div>
                 {% endif %}
