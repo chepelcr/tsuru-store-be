@@ -4,6 +4,7 @@ import mimetypes
 import os
 import uuid
 from datetime import datetime
+from typing import Optional
 from urllib.parse import urlparse
 
 import boto3
@@ -38,7 +39,7 @@ _jinja_env = Environment(
 _jinja_env.filters["format_currency"] = _format_currency
 
 
-def _document_logo_source(logo_url: str | None) -> str:
+def _document_logo_source(logo_url: Optional[str]) -> str:
     """Inline platform-hosted logos so Qt does not need to fetch them over HTTPS."""
     if not logo_url:
         return ""
