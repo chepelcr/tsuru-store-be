@@ -6,6 +6,8 @@ from datetime import date
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from app.enums.report_color import ReportColorScheme
+
 from .crossdocking_data_dto import CrossDockingDataDTO
 from .department_dto import DepartmentDTO
 from .order_detail_line_dto import OrderDetailLineResponse
@@ -104,6 +106,11 @@ class OrderResponse(BaseModel):
         "pending",
         description="Order status (pending, processing, shipped, delivered, cancelled)",
         examples=["pending", "processing", "shipped", "delivered", "cancelled"]
+    )
+
+    report_color: Optional[ReportColorScheme] = Field(
+        None,
+        description="Selected color scheme shared by the crossdocking view and generated reports",
     )
     
     client: Optional[PartyDTO] = Field(

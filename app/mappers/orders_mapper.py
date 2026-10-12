@@ -186,6 +186,7 @@ def order_to_response(order: Order) -> OrderResponse:
         creation_date=order.creation_date,
         delivery_date=order.delivery_date,
         order_status=order.order_status or "pending",
+        report_color=order.report_color,
         client=client_dto,
         client_id=str(order.client_id) if order.client_id else None,
         supplier=supplier_dto,
