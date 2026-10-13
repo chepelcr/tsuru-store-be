@@ -73,7 +73,7 @@ def _rendered_item_rows(html):
 
 
 def test_pdf_preserves_order_line_codes_descriptions_and_discount_amounts():
-    order = Order(document_number="2900679464", discounts=835, subtotal=26356, grand_total=28838.73)
+    order = Order(document_number="2900679464", discounts=835, subtotal=26356, taxes=3317.73, grand_total=28838.73)
     product = Product(name="Catalog product", description="Changed catalog text", codes=[
         {"code_type_id": "04", "number": "different-item"},
         {"code_type_id": "03", "number": "different-barcode"},
@@ -102,6 +102,7 @@ def test_pdf_preserves_order_line_codes_descriptions_and_discount_amounts():
         ["", "Manual article", "4", "12", "₡2,256.00", "₡285.89", "₡1,135.95", "₡9,874.06"],
     ]
     assert '>₡835.00</td>' in html
+    assert re.search(r'>Impuesto</td><td[^>]*>₡3,317\.73</td>', html)
     assert '>₡28,838.73</td>' in html
     assert "different-item" not in html and "Changed catalog text" not in html
     assert "7441119600652" not in html and "different-barcode" not in html
