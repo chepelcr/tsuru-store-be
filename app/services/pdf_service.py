@@ -3,10 +3,11 @@ import logging
 import mimetypes
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 import boto3
 import pdfkit
@@ -19,6 +20,11 @@ from app.enums.report_color import get_color_palette
 from app.models.order import Order
 
 logger = logging.getLogger(__name__)
+
+
+def _document_print_date(now: Optional[datetime] = None) -> str:
+    instant = now if now is not None else datetime.now(timezone.utc)
+    return instant.astimezone(ZoneInfo("America/Costa_Rica")).strftime("%d/%m/%Y")
 
 
 def _format_currency(value) -> str:
@@ -235,7 +241,7 @@ def create_order_pdf(order: Order) -> str:
     html = render_order_html(order)
     pdf_bytes = generate_pdf(
         html,
-        header_left=datetime.now().strftime("%d/%m/%Y"),
+        header_left=_document_print_date(),
         header_center="Orden de Compra",
     )
     prefix = order_file_prefix(order)
@@ -347,7 +353,7 @@ def create_crossdocking_pdf(order: Order, crossdocking_data, color=None) -> str:
     html = render_crossdocking_html(order, crossdocking_data, color)
     pdf_bytes = generate_pdf(
         html,
-        header_left=datetime.now().strftime("%d/%m/%Y"),
+        header_left=_document_print_date(),
         header_center="Hoja de distribución",
     )
     prefix = order_file_prefix(order)
