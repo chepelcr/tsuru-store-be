@@ -139,12 +139,12 @@
     <div class="section">
         <table class="items-table">
             <colgroup>
-                <col style="width: 8%;"><col style="width: 12%;"><col style="width: 27%;">
+                <col style="width: 9%;"><col style="width: 38%;">
                 <col style="width: 6%;"><col style="width: 6%;"><col style="width: 10%;">
                 <col style="width: 10%;"><col style="width: 10%;"><col style="width: 11%;">
             </colgroup>
             <thead><tr>
-                <th>Código<br>interno</th><th>Código</th><th style="text-align: left;">Artículo</th>
+                <th>Código<br>interno</th><th style="text-align: left;">Artículo</th>
                 <th class="center">Cantidad<br>pedida</th><th class="center">Unidades<br>pedidas</th>
                 <th class="num">Precio<br>unitario</th><th class="num">Descuento</th>
                 <th class="num">Impuesto</th><th class="num">Total</th>
@@ -152,7 +152,7 @@
             <tbody>
                 {% for line in lines %}
                 <tr{% if loop.index is even %} class="zebra"{% endif %}>
-                    <td>{{ line.internal_code | e }}</td><td>{{ line.code | e }}</td>
+                    <td>{{ line.internal_code | e }}</td>
                     <td>{{ line.description | e }}</td>
                     <td class="center">{{ line.quantity_ordered }}</td><td class="center">{{ line.units_ordered }}</td>
                     <td class="num">{{ line.unit_price | format_currency }}</td>

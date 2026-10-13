@@ -77,11 +77,9 @@ def render_order_html(order: Order) -> str:
         line_codes = ln.codes or []
         product_codes = p.codes if p else []
         internal_code = _get_code_from_array(line_codes, "04") or _get_code_from_array(product_codes, "04")
-        code = _get_code_from_array(line_codes, "03") or _get_code_from_array(product_codes, "03")
         
         lines.append({
             "internal_code": internal_code,
-            "code": code,
             "description": ln.description or (p.description if p else "") or "",
             "quantity_ordered": ln.quantity_ordered or 0,
             "units_ordered": ln.units_ordered or 0,

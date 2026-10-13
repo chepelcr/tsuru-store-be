@@ -98,12 +98,13 @@ def test_pdf_preserves_order_line_codes_descriptions_and_discount_amounts():
     rows = _rendered_item_rows(html)
 
     assert rows == [
-        ["2645516", "7441119600652", "Order article & description", "4", "12", "4,333.00", "549.11", "2,181.78", "18,964.67"],
-        ["", "", "Manual article", "4", "12", "2,256.00", "285.89", "1,135.95", "9,874.06"],
+        ["2645516", "Order article & description", "4", "12", "4,333.00", "549.11", "2,181.78", "18,964.67"],
+        ["", "Manual article", "4", "12", "2,256.00", "285.89", "1,135.95", "9,874.06"],
     ]
     assert '>835.00</td>' in html
     assert '>28,838.73</td>' in html
     assert "different-item" not in html and "Changed catalog text" not in html
+    assert "7441119600652" not in html and "different-barcode" not in html
     # Rendering changes neither the amounts nor the order's own article data.
     assert first.discount == 549.11 and second.discount == 285.89 and order.discounts == 835
 
@@ -119,4 +120,5 @@ def test_legacy_order_line_keeps_catalog_fallback_and_zero_discount():
 
     rows = _rendered_item_rows(render_order_html(order))
 
-    assert rows == [["legacy-item", "legacy-barcode", "Legacy article", "1", "1", "100.00", "0.00", "13.00", "113.00"]]
+    assert rows == [["legacy-item", "Legacy article", "1", "1", "100.00", "0.00", "13.00", "113.00"]]
+    assert "legacy-barcode" not in render_order_html(order)
