@@ -159,7 +159,7 @@
             <tbody>
                 {% for line in lines %}
                 <tr{% if loop.index is even %} class="zebra"{% endif %}>
-                    <td>{{ line.internal_code | e }}</td>
+                    <td class="center">{{ line.internal_code | e }}</td>
                     <td class="center">{{ line.description | e }}</td>
                     <td class="center">{{ line.quantity_ordered }}</td><td class="center">{{ line.units_ordered }}</td>
                     <td class="num">{{ line.unit_price | format_order_money(currency_code) }}</td>
