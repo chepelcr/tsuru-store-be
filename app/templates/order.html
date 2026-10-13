@@ -57,9 +57,9 @@
         .client-name { font-size: 13px; font-weight: 700; }
         .detail-label { color: #655D54; width: 30%; }
         .detail-value { font-weight: 700; }
-        .inline-label { display: inline-block; width: 75px; color: #655D54; }
+        .inline-label { display: inline-block; width: 85px; color: #655D54; }
         .metadata-pair { display: table; width: 100%; table-layout: fixed; }
-        .metadata-label { display: table-cell; width: 90px; color: #655D54; white-space: nowrap; }
+        .metadata-label { display: table-cell; width: 104px; color: #655D54; white-space: nowrap; }
         .metadata-value { display: table-cell; font-weight: 700; white-space: nowrap; }
         .comment-panel { page-break-inside: avoid; }
         .comment-panel .section-label { width: 100px; }
@@ -72,6 +72,7 @@
         .items-table tbody td { padding: 9px 5px; border-bottom: 1px solid #E5DCCF; word-wrap: break-word; }
         .items-table tbody tr { page-break-inside: avoid; }
         .items-table tbody tr.zebra td { background: #FCFAF6; }
+        .items-table tbody td.center, .product-name { text-align: center; }
         .line-total { font-weight: 700; }
         .discount { color: #6B2A22; }
 
@@ -160,7 +161,7 @@
                 {% for line in lines %}
                 <tr{% if loop.index is even %} class="zebra"{% endif %}>
                     <td class="center">{{ line.internal_code | e }}</td>
-                    <td class="center">{{ line.description | e }}</td>
+                    <td class="center"><div class="product-name">{{ line.description | e }}</div></td>
                     <td class="center">{{ line.quantity_ordered }}</td><td class="center">{{ line.units_ordered }}</td>
                     <td class="num">{{ line.unit_price | format_order_money(currency_code) }}</td>
                     <td class="num discount">{{ line.discount | format_order_money(currency_code) }}</td>
