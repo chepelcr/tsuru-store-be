@@ -64,12 +64,23 @@
         .comment-panel { page-break-inside: avoid; }
         .comment-panel .section-label { width: 100px; }
 
+        .items-section { padding: 4px 0; }
         .items-table { border-collapse: separate; border-spacing: 0; font-size: 14px; }
         .items-table thead { display: table-header-group; }
         .items-table th { background: #2E5033; color: #fff; font-size: 11px; font-weight: 700; padding: 7px 5px; vertical-align: middle; text-align: center; }
         .items-table th:first-child { border-radius: 8px 0 0 8px; }
         .items-table th:last-child { border-radius: 0 8px 8px 0; }
-        .items-table tbody td { padding: 9px 5px; border-bottom: 1px solid #E5DCCF; word-wrap: break-word; }
+        .items-table .items-gap td { height: 8px; font-size: 0; line-height: 0; }
+        .items-table tbody td { padding: 9px 5px; background: #fff; border-bottom: 1px solid #E5DCCF; word-wrap: break-word; }
+        /* Round the outside cells: QtWebKit does not clip table row groups. */
+        .items-table tbody td:first-child { border-left: 1px solid #E5DCCF; }
+        .items-table tbody td:last-child { border-right: 1px solid #E5DCCF; }
+        .items-table tbody tr:first-child td { border-top: 1px solid #E5DCCF; padding-top: 14px; }
+        .items-table tbody tr:last-child td { padding-bottom: 14px; }
+        .items-table tbody tr:first-child td:first-child { border-top-left-radius: 12px; }
+        .items-table tbody tr:first-child td:last-child { border-top-right-radius: 12px; }
+        .items-table tbody tr:last-child td:first-child { border-bottom-left-radius: 12px; }
+        .items-table tbody tr:last-child td:last-child { border-bottom-right-radius: 12px; }
         .items-table tbody tr { page-break-inside: avoid; }
         .items-table tbody tr.zebra td { background: #FCFAF6; }
         .items-table tbody td.center, .product-name { text-align: center; }
@@ -144,7 +155,7 @@
         </tr></table>
     </div>
 
-    <div class="section">
+    <div class="section items-section">
         <table class="items-table">
             <colgroup>
                 <col style="width: 9%;"><col style="width: 38%;">
@@ -156,7 +167,7 @@
                 <th class="center">Cantidad<br>pedida</th><th class="center">Unidades<br>pedidas</th>
                 <th class="num">Precio<br>unitario</th><th class="num">Descuento</th>
                 <th class="num">Impuesto</th><th class="num">Total</th>
-            </tr></thead>
+            </tr><tr class="items-gap" aria-hidden="true"><td colspan="8"></td></tr></thead>
             <tbody>
                 {% for line in lines %}
                 <tr{% if loop.index is even %} class="zebra"{% endif %}>
