@@ -560,6 +560,9 @@ def update_order(
     re-reads them and `_update_order_from_parsed` assigns `delivery_date` from what it
     finds, so a database-only change is reverted the next time anyone reprocesses —
     and Reprocess sits in the order's own menu in the POS.
+
+    The same save refreshes the purchase-order PDF. If rendering fails, its URL
+    stays empty so a later `get_order` retries instead of serving the old date.
     """
     with OrderRepository() as repo:
         order = repo.find_by_company_and_document(organization_id, document_number)
@@ -586,12 +589,24 @@ def update_order(
                 )
             order.order_status = status
 
+        if delivery_date is not None:
+            order.pdf_url = None
+
         order = repo.save(order)
 
-        # After the commit: the sheets are a copy of what the row now says, and a
-        # failure to rewrite them must not roll back a change the operator made.
+        # Refresh derived files here, within the date-update operation. The
+        # attached order is committed by the repository context on return.
         if delivery_date is not None:
             rewrite_delivery_date(order, delivery_date)
+            try:
+                order.pdf_url = create_order_pdf(order)
+            except Exception:
+                logger.warning(
+                    "Could not refresh the PDF after changing order %s delivery date; "
+                    "the next order read will retry",
+                    document_number,
+                    exc_info=True,
+                )
 
         return order_to_response(order)
 

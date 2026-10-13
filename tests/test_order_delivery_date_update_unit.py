@@ -27,6 +27,7 @@ from app.enums.order_status import OrderStatus
 from app.services.order_service import (
     DELIVERY_DATE_EDITABLE_STATUSES,
     _assert_delivery_date_editable,
+    get_order,
     update_order,
 )
 
@@ -43,6 +44,8 @@ def order(**overrides):
     stub.document_info = None
     stub.excel_url = "https://files.example/4500123456-DT.xlsx"
     stub.crossdocking_excel_url = None
+    stub.crossdocking_sale_points = []
+    stub.pdf_url = "https://files.example/4500123456-OC.pdf"
     for key, value in overrides.items():
         setattr(stub, key, value)
     return stub
@@ -107,12 +110,18 @@ class TestUpdateOrder:
             yield spy
 
     @pytest.fixture(autouse=True)
+    def pdf(self):
+        with patch("app.services.order_service.create_order_pdf",
+                   return_value="https://files.example/refreshed-OC.pdf") as spy:
+            yield spy
+
+    @pytest.fixture(autouse=True)
     def _response(self):
         with patch("app.services.order_service.order_to_response",
                    side_effect=lambda o: o):
             yield
 
-    def test_rewrites_the_spreadsheets(self, repo, rewrite):
+    def test_rewrites_the_spreadsheets(self, repo, rewrite, pdf):
         """THE test. Without this the next reprocess silently undoes the edit."""
         existing = order()
         repo.find_by_company_and_document.return_value = existing
@@ -122,8 +131,43 @@ class TestUpdateOrder:
 
         assert existing.delivery_date == TOMORROW
         rewrite.assert_called_once_with(existing, TOMORROW)
+        pdf.assert_called_once_with(existing)
+        assert existing.pdf_url == pdf.return_value
 
-    def test_does_not_touch_the_spreadsheets_for_a_status_change(self, repo, rewrite):
+    def test_pdf_is_rendered_with_the_new_date_and_old_url_invalidated(self, repo, rewrite, pdf):
+        existing = order()
+        repo.find_by_company_and_document.return_value = existing
+        repo.save.return_value = existing
+
+        def render(updated):
+            assert updated.delivery_date == TOMORROW
+            assert updated.pdf_url is None
+            return "https://files.example/refreshed-OC.pdf"
+
+        pdf.side_effect = render
+        result = update_order("org-1", "4500123456", delivery_date=TOMORROW)
+
+        assert result.pdf_url == "https://files.example/refreshed-OC.pdf"
+        repo.save.assert_called_once_with(existing)
+
+    def test_failed_render_keeps_the_date_and_a_later_read_retries(self, repo, rewrite, pdf):
+        existing = order()
+        repo.find_by_company_and_document.return_value = existing
+        repo.save.return_value = existing
+        pdf.side_effect = [RuntimeError("renderer unavailable"), "https://files.example/refreshed-OC.pdf"]
+
+        result = update_order("org-1", "4500123456", delivery_date=TOMORROW)
+
+        assert result.delivery_date == TOMORROW
+        assert result.pdf_url is None
+
+        recovered = get_order("org-1", "4500123456")
+
+        assert recovered.delivery_date == TOMORROW
+        assert recovered.pdf_url == "https://files.example/refreshed-OC.pdf"
+        assert pdf.call_count == 2
+
+    def test_does_not_touch_the_spreadsheets_for_a_status_change(self, repo, rewrite, pdf):
         existing = order()
         repo.find_by_company_and_document.return_value = existing
         repo.save.return_value = existing
@@ -132,8 +176,10 @@ class TestUpdateOrder:
 
         assert existing.order_status == OrderStatus.PROCESSING.value
         rewrite.assert_not_called()
+        pdf.assert_not_called()
+        assert existing.pdf_url == "https://files.example/4500123456-OC.pdf"
 
-    def test_a_refused_date_is_not_saved(self, repo, rewrite):
+    def test_a_refused_date_is_not_saved(self, repo, rewrite, pdf):
         existing = order(document_id="sale-1")
         repo.find_by_company_and_document.return_value = existing
 
@@ -142,6 +188,8 @@ class TestUpdateOrder:
 
         repo.save.assert_not_called()
         rewrite.assert_not_called()
+        pdf.assert_not_called()
+        assert existing.pdf_url == "https://files.example/4500123456-OC.pdf"
 
     def test_every_editable_status_is_a_real_one(self):
         """Guards against the invented-status mistake made once already today."""
