@@ -20,10 +20,10 @@
            colors and table layouts rather than CSS variables or flexbox. */
         * { box-sizing: border-box; }
         html, body, table, th, td, div { margin: 0; padding: 0; font-family: Inter, Arial, sans-serif; }
-        body { background: #fff; color: #3D4045; font-size: 11px; line-height: 1.4; }
+        body { background: #fff; color: #3D4045; font-size: 13px; line-height: 1.4; }
         table { width: 100%; table-layout: fixed; border-collapse: collapse; }
         td, th { vertical-align: top; }
-        .num { text-align: right; white-space: nowrap; }
+        .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
         .center { text-align: center; }
         .muted { color: #655D54; }
 
@@ -38,11 +38,11 @@
         .logo-panel td { padding: 8px; vertical-align: middle; }
         .supplier-logo { display: block; max-width: 150px; max-height: 68px; width: auto; height: auto; margin: 0 auto; }
         .company-name { color: #fff; font-size: 14px; font-weight: 700; }
-        .vendor-number { color: #F4EFE6; font-size: 9px; margin-top: 4px; }
+        .vendor-number { color: #F4EFE6; font-size: 11px; margin-top: 4px; }
         .document-cell { width: 176px; text-align: right; }
         .doc-pill { width: auto; display: inline-table; table-layout: auto; background: #542119; border-radius: 8px; }
         .doc-pill td { padding: 8px 12px; text-align: right; white-space: nowrap; }
-        .document-title { color: #F4EFE6; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; }
+        .document-title { color: #F4EFE6; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
         .document-number { color: #fff; font-size: 18px; font-weight: 700; margin-top: 3px; }
 
         .section { margin-top: 14px; }
@@ -52,7 +52,7 @@
         .panel td { padding: 3px 12px; word-wrap: break-word; }
         .panel tr:first-child td { padding-top: 10px; }
         .panel tr:last-child td { padding-bottom: 10px; }
-        .section-label { color: #6B2A22; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; }
+        .section-label { color: #6B2A22; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
         .panel-client .section-label { color: #2E5033; }
         .client-name { font-size: 13px; font-weight: 700; }
         .detail-label { color: #655D54; width: 30%; }
@@ -60,9 +60,9 @@
         .comment-panel { page-break-inside: avoid; }
         .comment-panel .section-label { width: 100px; }
 
-        .items-table { border-collapse: separate; border-spacing: 0; font-size: 9px; }
+        .items-table { border-collapse: separate; border-spacing: 0; font-size: 14px; }
         .items-table thead { display: table-header-group; }
-        .items-table th { background: #2E5033; color: #fff; font-weight: 700; padding: 7px 5px; vertical-align: middle; }
+        .items-table th { background: #2E5033; color: #fff; font-size: 11px; font-weight: 700; padding: 7px 5px; vertical-align: middle; }
         .items-table th:first-child { border-radius: 8px 0 0 8px; }
         .items-table th:last-child { border-radius: 0 8px 8px 0; }
         .items-table tbody td { padding: 9px 5px; border-bottom: 1px solid #E5DCCF; word-wrap: break-word; }
