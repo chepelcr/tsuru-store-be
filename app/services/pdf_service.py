@@ -28,6 +28,12 @@ def _format_currency(value) -> str:
         return "0.00"
 
 
+def _format_order_money(value, currency_code="CRC") -> str:
+    code = (currency_code or "CRC").upper()
+    symbol = {"CRC": "₡", "USD": "$"}.get(code, f"{code} ")
+    return f"{symbol}{_format_currency(value)}"
+
+
 from app.utils.product_codes import find_code_number as _get_code_from_array  # noqa: E402
 
 
@@ -38,6 +44,7 @@ _jinja_env = Environment(
     autoescape=False,
 )
 _jinja_env.filters["format_currency"] = _format_currency
+_jinja_env.filters["format_order_money"] = _format_order_money
 
 
 def _document_logo_source(logo_url: Optional[str]) -> str:
@@ -116,6 +123,7 @@ def render_order_html(order: Order) -> str:
     template_model = {
         "font_regular_url": (Path(_template_dir) / "fonts" / "Inter-Regular.ttf").resolve().as_uri(),
         "font_bold_url": (Path(_template_dir) / "fonts" / "Inter-Bold.ttf").resolve().as_uri(),
+        "currency_code": order.currency_code or "CRC",
         "supplier_name": supplier_name,
         "supplier_internal_code": supplier_internal_code,
         "supplier_logo_url": supplier_logo_url,

@@ -66,7 +66,7 @@
 
         .items-table { border-collapse: separate; border-spacing: 0; font-size: 14px; }
         .items-table thead { display: table-header-group; }
-        .items-table th { background: #2E5033; color: #fff; font-size: 11px; font-weight: 700; padding: 7px 5px; vertical-align: middle; }
+        .items-table th { background: #2E5033; color: #fff; font-size: 11px; font-weight: 700; padding: 7px 5px; vertical-align: middle; text-align: center; }
         .items-table th:first-child { border-radius: 8px 0 0 8px; }
         .items-table th:last-child { border-radius: 0 8px 8px 0; }
         .items-table tbody td { padding: 9px 5px; border-bottom: 1px solid #E5DCCF; word-wrap: break-word; }
@@ -151,7 +151,7 @@
                 <col style="width: 10%;"><col style="width: 10%;"><col style="width: 11%;">
             </colgroup>
             <thead><tr>
-                <th>Código<br>interno</th><th style="text-align: left;">Artículo</th>
+                <th>Código<br>interno</th><th>Artículo</th>
                 <th class="center">Cantidad<br>pedida</th><th class="center">Unidades<br>pedidas</th>
                 <th class="num">Precio<br>unitario</th><th class="num">Descuento</th>
                 <th class="num">Impuesto</th><th class="num">Total</th>
@@ -160,12 +160,12 @@
                 {% for line in lines %}
                 <tr{% if loop.index is even %} class="zebra"{% endif %}>
                     <td>{{ line.internal_code | e }}</td>
-                    <td>{{ line.description | e }}</td>
+                    <td class="center">{{ line.description | e }}</td>
                     <td class="center">{{ line.quantity_ordered }}</td><td class="center">{{ line.units_ordered }}</td>
-                    <td class="num">{{ line.unit_price | format_currency }}</td>
-                    <td class="num discount">{{ line.discount | format_currency }}</td>
-                    <td class="num">{{ line.tax | format_currency }}</td>
-                    <td class="num line-total">{{ line.line_total | format_currency }}</td>
+                    <td class="num">{{ line.unit_price | format_order_money(currency_code) }}</td>
+                    <td class="num discount">{{ line.discount | format_order_money(currency_code) }}</td>
+                    <td class="num">{{ line.tax | format_order_money(currency_code) }}</td>
+                    <td class="num line-total">{{ line.line_total | format_order_money(currency_code) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -184,10 +184,10 @@
             <td style="width: 2%;"></td>
             <td>
                 <table class="panel totals">
-                    <tr><td class="muted">Subtotal</td><td class="num value">{{ subtotal | format_currency }}</td></tr>
-                    <tr><td class="muted">Descuento</td><td class="num value discount">{{ total_discounts | format_currency }}</td></tr>
+                    <tr><td class="muted">Subtotal</td><td class="num value">{{ subtotal | format_order_money(currency_code) }}</td></tr>
+                    <tr><td class="muted">Descuento</td><td class="num value discount">{{ total_discounts | format_order_money(currency_code) }}</td></tr>
                 </table>
-                <table class="total-pill"><tr><td>Total</td><td class="num">{{ grand_total | format_currency }}</td></tr></table>
+                <table class="total-pill"><tr><td>Total</td><td class="num">{{ grand_total | format_order_money(currency_code) }}</td></tr></table>
             </td>
         </tr></table>
     </div>
