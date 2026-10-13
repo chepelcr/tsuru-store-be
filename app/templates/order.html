@@ -57,6 +57,10 @@
         .client-name { font-size: 13px; font-weight: 700; }
         .detail-label { color: #655D54; width: 30%; }
         .detail-value { font-weight: 700; }
+        .inline-label { display: inline-block; width: 75px; color: #655D54; }
+        .metadata-pair { display: table; width: 100%; table-layout: fixed; }
+        .metadata-label { display: table-cell; width: 90px; color: #655D54; white-space: nowrap; }
+        .metadata-value { display: table-cell; font-weight: 700; white-space: nowrap; }
         .comment-panel { page-break-inside: avoid; }
         .comment-panel .section-label { width: 100px; }
 
@@ -110,20 +114,23 @@
     <div class="section">
         <table class="details-layout">
             <tr>
-                <td style="width: 55%;">
+                <td style="width: 52%;">
                     <table class="panel panel-client">
-                        <tr><td colspan="2" class="section-label">CLIENTE</td></tr>
-                        <tr><td colspan="2"><div class="client-name">{{ client_name | e }}</div><div class="muted">{{ client_gln | e }}</div></td></tr>
-                        <tr><td class="detail-label">Entrega en</td><td class="detail-value">{{ deliver_to | e }}</td></tr>
+                        <tr><td><span class="inline-label">Cliente:</span><span class="detail-value">{{ client_name | e }} - {{ client_gln | e }}</span></td></tr>
+                        <tr><td><span class="inline-label">Entrega en:</span><span class="detail-value">{{ deliver_to | e }}</span></td></tr>
                     </table>
                 </td>
                 <td style="width: 2%;"></td>
                 <td>
                     <table class="panel">
-                        <tr><td class="detail-label">Creación</td><td class="detail-value">{{ creation_date_formatted | e }}</td></tr>
-                        <tr><td class="detail-label">Despacho</td><td class="detail-value">{{ delivery_date_formatted | e }}</td></tr>
-                        <tr><td class="detail-label">Tipo de orden</td><td class="detail-value">{{ order_type | e }}</td></tr>
-                        <tr><td class="detail-label">Departamento</td><td class="detail-value">{{ department | e }}</td></tr>
+                        <tr>
+                            <td><div class="metadata-pair"><span class="metadata-label">Creación:</span><span class="metadata-value">{{ creation_date_formatted | e }}</span></div></td>
+                            <td><div class="metadata-pair"><span class="metadata-label">Despacho:</span><span class="metadata-value">{{ delivery_date_formatted | e }}</span></div></td>
+                        </tr>
+                        <tr>
+                            <td><div class="metadata-pair"><span class="metadata-label">Departamento:</span><span class="metadata-value">{{ department | e }}</span></div></td>
+                            <td><div class="metadata-pair"><span class="metadata-label">Tipo orden:</span><span class="metadata-value">{{ order_type | e }}</span></div></td>
+                        </tr>
                     </table>
                 </td>
             </tr>
