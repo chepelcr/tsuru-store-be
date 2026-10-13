@@ -4,6 +4,7 @@ import mimetypes
 import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -71,14 +72,17 @@ def render_order_html(order: Order) -> str:
     lines = []
     for ln in lines_data:
         p = ln.product
-        # Extract codes from JSONB array
-        internal_code = _get_code_from_array(p.codes if p else [], "04")
-        code = _get_code_from_array(p.codes if p else [], "03")
+        # Match the order detail: the order's own codes and description win
+        # over catalog values that may have changed since the order was placed.
+        line_codes = ln.codes or []
+        product_codes = p.codes if p else []
+        internal_code = _get_code_from_array(line_codes, "04") or _get_code_from_array(product_codes, "04")
+        code = _get_code_from_array(line_codes, "03") or _get_code_from_array(product_codes, "03")
         
         lines.append({
             "internal_code": internal_code,
             "code": code,
-            "description": (p.description if p else "") or "",
+            "description": ln.description or (p.description if p else "") or "",
             "quantity_ordered": ln.quantity_ordered or 0,
             "units_ordered": ln.units_ordered or 0,
             "unit_price": float(ln.unit_price or 0),
@@ -112,6 +116,8 @@ def render_order_html(order: Order) -> str:
         deliver_to_gln = ""
 
     template_model = {
+        "font_regular_url": (Path(_template_dir) / "fonts" / "Inter-Regular.ttf").resolve().as_uri(),
+        "font_bold_url": (Path(_template_dir) / "fonts" / "Inter-Bold.ttf").resolve().as_uri(),
         "supplier_name": supplier_name,
         "supplier_internal_code": supplier_internal_code,
         "supplier_logo_url": supplier_logo_url,

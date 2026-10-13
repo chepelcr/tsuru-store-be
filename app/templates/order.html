@@ -2,262 +2,187 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orden de Compra</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        @font-face {
+            font-family: Inter;
+            src: url("{{ font_regular_url }}") format("truetype");
+            font-weight: 400;
+            font-style: normal;
         }
-
-        body {
-            font-family: Arial, sans-serif;
-            font-size: 10px;
-            line-height: 1.2;
-            color: #000 !important;
-            background: #fff !important;
-            margin: 0;
-            padding: 0;
+        @font-face {
+            font-family: Inter;
+            src: url("{{ font_bold_url }}") format("truetype");
+            font-weight: 700;
+            font-style: normal;
         }
+        /* Mirrors the invoice PDF print identity. QtWebKit needs literal
+           colors and table layouts rather than CSS variables or flexbox. */
+        * { box-sizing: border-box; }
+        html, body, table, th, td, div { margin: 0; padding: 0; font-family: Inter, Arial, sans-serif; }
+        body { background: #fff; color: #3D4045; font-size: 11px; line-height: 1.4; }
+        table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+        td, th { vertical-align: top; }
+        .num { text-align: right; white-space: nowrap; }
+        .center { text-align: center; }
+        .muted { color: #655D54; }
 
-        .header-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
+        .band, .doc-pill, .logo-panel, .panel, .total-pill {
+            border-collapse: separate;
+            border-spacing: 0;
         }
+        .band { background: #6B2A22; border-top: 3px solid #E8B83A; border-radius: 12px; }
+        .band > tbody > tr > td { padding: 14px 12px; vertical-align: middle; }
+        .band .logo-cell { width: 24%; padding-right: 0; }
+        .logo-panel { background: #fff; border-radius: 8px; }
+        .logo-panel td { padding: 8px; vertical-align: middle; }
+        .supplier-logo { display: block; max-width: 150px; max-height: 68px; width: auto; height: auto; margin: 0 auto; }
+        .company-name { color: #fff; font-size: 14px; font-weight: 700; }
+        .vendor-number { color: #F4EFE6; font-size: 9px; margin-top: 4px; }
+        .document-cell { width: 34%; }
+        .doc-pill { background: #542119; border-radius: 8px; }
+        .doc-pill td { padding: 10px 12px; text-align: right; }
+        .document-title { color: #F4EFE6; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; }
+        .document-number { color: #fff; font-size: 18px; font-weight: 700; margin-top: 3px; }
 
-        .header-table td {
-            vertical-align: middle;
-            border: none;
-            padding: 0 0 10px 0;
-        }
+        .section { margin-top: 14px; }
+        .details-layout { border-collapse: separate; border-spacing: 0; }
+        .panel { background: #FCFAF6; border: 1px solid #E5DCCF; border-radius: 12px; }
+        .panel-client { background: #EDF2EB; border-color: #DCE6D9; }
+        .panel td { padding: 3px 12px; word-wrap: break-word; }
+        .panel tr:first-child td { padding-top: 10px; }
+        .panel tr:last-child td { padding-bottom: 10px; }
+        .section-label { color: #6B2A22; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; }
+        .panel-client .section-label { color: #2E5033; }
+        .client-name { font-size: 13px; font-weight: 700; }
+        .detail-label { color: #655D54; width: 30%; }
+        .detail-value { font-weight: 700; }
+        .comment-panel { page-break-inside: avoid; }
+        .comment-panel .section-label { width: 100px; }
 
-        .header-logo-cell {
-            width: 90px;
-        }
+        .items-table { border-collapse: separate; border-spacing: 0; font-size: 9px; }
+        .items-table thead { display: table-header-group; }
+        .items-table th { background: #2E5033; color: #fff; font-weight: 700; padding: 7px 5px; vertical-align: middle; }
+        .items-table th:first-child { border-radius: 8px 0 0 8px; }
+        .items-table th:last-child { border-radius: 0 8px 8px 0; }
+        .items-table tbody td { padding: 9px 5px; border-bottom: 1px solid #E5DCCF; word-wrap: break-word; }
+        .items-table tbody tr { page-break-inside: avoid; }
+        .items-table tbody tr.zebra td { background: #FCFAF6; }
+        .line-total { font-weight: 700; }
+        .discount { color: #6B2A22; }
 
-        .header-logo-cell.has-logo {
-            width: 190px;
-        }
-
-        .supplier-logo {
-            display: block;
-            max-width: 180px;
-            max-height: 80px;
-            width: auto;
-            height: auto;
-        }
-
-        .logo {
-            width: 80px;
-            height: 80px;
-            background: #4CAF50;
-            border-radius: 50%;
-            color: white;
-            font-weight: bold;
-            font-size: 12px;
-            text-align: center;
-            line-height: 80px;
-        }
-
-        .header-center-cell {
-            text-align: center;
-        }
-
-        .company-name {
-            font-size: 16px;
-            font-weight: bold;
-            color: #000 !important;
-            margin-bottom: 5px;
-        }
-
-        .vendor-number {
-            font-size: 11px;
-            color: #000 !important;
-        }
-
-        .document-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #000 !important;
-            margin: 10px 0;
-        }
-
-        .order-details {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-            color: #000 !important;
-        }
-
-        .order-details td {
-            border: none;
-            padding: 2px 5px;
-            vertical-align: top;
-        }
-
-        .detail-label {
-            font-weight: bold;
-            color: #000 !important;
-            white-space: nowrap;
-            width: 80px;
-        }
-
-        .detail-value {
-            color: #000 !important;
-        }
-
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 9px;
-        }
-
-        .items-table th {
-            background: #f0f0f0 !important;
-            border: none;
-            border-bottom: 2px solid #000;
-            padding: 8px 3px;
-            text-align: center;
-            vertical-align: middle;
-            font-weight: bold;
-            color: #000 !important;
-        }
-
-        .items-table td {
-            border: none;
-            padding: 6px 3px;
-            text-align: center;
-            vertical-align: middle;
-            color: #000 !important;
-        }
-
-        .items-table tbody {
-            border-bottom: 1px solid #000;
-        }
-
-        .items-table .text-left {
-            text-align: left;
-        }
-
-        .items-table .text-right {
-            text-align: right;
-        }
-
-        .totals-row td {
-            padding-top: 8px !important;
-        }
-
+        .summary { page-break-inside: avoid; }
+        .counts td { padding: 10px 12px; }
+        .counts .count { font-size: 16px; font-weight: 700; margin-top: 2px; }
+        .totals td { padding: 6px 12px; }
+        .totals .value { font-weight: 700; }
+        .totals tr:first-child td { border-bottom: 1px solid #E5DCCF; }
+        .total-pill { background: #6B2A22; border-left: 4px solid #E8B83A; border-radius: 12px; margin-top: 8px; }
+        .total-pill td { color: #fff; font-size: 14px; font-weight: 700; padding: 10px 12px; }
         @media print {
-            body {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>
 </head>
 <body>
-    <table class="header-table">
+    <table class="band">
         <tr>
-            <td class="header-logo-cell{% if supplier_logo_url %} has-logo{% endif %}">
-                {% if supplier_logo_url %}
-                <img class="supplier-logo" src="{{ supplier_logo_url | e }}" alt="{{ supplier_name | e }}">
-                {% else %}
-                <div class="logo">LOGO</div>
-                {% endif %}
+            {% if supplier_logo_url %}
+            <td class="logo-cell">
+                <table class="logo-panel"><tr><td>
+                    <img class="supplier-logo" src="{{ supplier_logo_url | e }}" alt="{{ supplier_name | e }}">
+                </td></tr></table>
             </td>
-            <td class="header-center-cell">
-                <div class="company-name">{{ supplier_name }}</div>
-                <div class="vendor-number">Vendor Number: {{ supplier_internal_code }}</div>
-                <div class="document-title">Orden de Compra # {{ document_number }} EDI</div>
+            {% endif %}
+            <td>
+                <div class="company-name">{{ supplier_name | e }}</div>
+                <div class="vendor-number">Vendor Number: {{ supplier_internal_code | e }}</div>
+            </td>
+            <td class="document-cell">
+                <table class="doc-pill"><tr><td>
+                    <div class="document-title">ORDEN DE COMPRA · EDI</div>
+                    <div class="document-number">{{ document_number | e }}</div>
+                </td></tr></table>
             </td>
         </tr>
     </table>
 
-    <table class="order-details">
-        <tr>
-            <td class="detail-label">Cliente:</td>
-            <td class="detail-value">{{ client_name }} - {{ client_gln }}</td>
-            <td class="detail-label">Creación:</td>
-            <td class="detail-value">{{ creation_date_formatted }}</td>
-        </tr>
-        <tr>
-            <td class="detail-label">Entrega en:</td>
-            <td class="detail-value">{{ deliver_to }}</td>
-            <td class="detail-label">Despacho:</td>
-            <td class="detail-value">{{ delivery_date_formatted }}</td>
-        </tr>
-        <tr>
-            <td class="detail-label">Tipo Orden:</td>
-            <td class="detail-value">{{ order_type }}</td>
-            <td class="detail-label">Dpto:</td>
-            <td class="detail-value">{{ department }}</td>
-        </tr>
-        <tr>
-            <td class="detail-label">Comentario:</td>
-            <td class="detail-value">{{ comment }}</td>
-            <td></td>
-            <td></td>
-        </tr>
-    </table>
+    <div class="section">
+        <table class="details-layout">
+            <tr>
+                <td style="width: 55%;">
+                    <table class="panel panel-client">
+                        <tr><td colspan="2" class="section-label">CLIENTE</td></tr>
+                        <tr><td colspan="2"><div class="client-name">{{ client_name | e }}</div><div class="muted">{{ client_gln | e }}</div></td></tr>
+                        <tr><td class="detail-label">Entrega en</td><td class="detail-value">{{ deliver_to | e }}</td></tr>
+                    </table>
+                </td>
+                <td style="width: 2%;"></td>
+                <td>
+                    <table class="panel">
+                        <tr><td class="detail-label">Creación</td><td class="detail-value">{{ creation_date_formatted | e }}</td></tr>
+                        <tr><td class="detail-label">Despacho</td><td class="detail-value">{{ delivery_date_formatted | e }}</td></tr>
+                        <tr><td class="detail-label">Tipo de orden</td><td class="detail-value">{{ order_type | e }}</td></tr>
+                        <tr><td class="detail-label">Departamento</td><td class="detail-value">{{ department | e }}</td></tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </div>
 
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th>Código<br>Interno</th>
-                <th>Código</th>
-                <th>Artículo</th>
-                <th>Cantidad<br>Pedidas</th>
-                <th>Unidades<br>Pedidas</th>
-                <th>Precio<br>Unitario</th>
-                <th>Descuento</th>
-                <th>Impuesto</th>
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for line in lines %}
-            <tr>
-                <td>{{ line.internal_code }}</td>
-                <td>{{ line.code }}</td>
-                <td class="text-left">{{ line.description }}</td>
-                <td>{{ line.quantity_ordered }}</td>
-                <td>{{ line.units_ordered }}</td>
-                <td class="text-right">{{ line.unit_price | format_currency }}</td>
-                <td class="text-right">{{ line.discount | format_currency }}</td>
-                <td class="text-right">{{ line.tax | format_currency }}</td>
-                <td class="text-right">{{ line.line_total | format_currency }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        <tfoot>
-            <tr class="totals-row" style="font-weight: bold; border: none;">
-                <td style="border: none;">LÍNEAS: {{ line_count }}</td>
-                <td style="border: none;"></td>
-                <td class="text-right" style="border: none;">TOTALES:</td>
-                <td style="border: none;">{{ total_quantities }}</td>
-                <td style="border: none;">{{ total_units_ordered }}</td>
-                <td style="border: none;"></td>
-                <td class="text-right" style="border: none;">{{ total_discounts | format_currency }}</td>
-                <td style="border: none;"></td>
-                <td class="text-right" style="border: none;">{{ subtotal | format_currency }}</td>
-            </tr>
-            <tr style="font-weight: bold; border: none;">
-                <td style="border: none;"></td>
-                <td style="border: none;"></td>
-                <td style="border: none;"></td>
-                <td style="border: none;"></td>
-                <td style="border: none;"></td>
-                <td style="border: none;"></td>
-                <td style="border: none;"></td>
-                <td class="text-right" style="border: none;">TOTAL</td>
-                <td class="text-right" style="border: none;">{{ grand_total | format_currency }}</td>
-            </tr>
-        </tfoot>
-    </table>
+    <div class="section">
+        <table class="panel comment-panel"><tr>
+            <td class="section-label">COMENTARIO</td><td>{{ comment | e }}</td>
+        </tr></table>
+    </div>
+
+    <div class="section">
+        <table class="items-table">
+            <colgroup>
+                <col style="width: 8%;"><col style="width: 12%;"><col style="width: 27%;">
+                <col style="width: 6%;"><col style="width: 6%;"><col style="width: 10%;">
+                <col style="width: 10%;"><col style="width: 10%;"><col style="width: 11%;">
+            </colgroup>
+            <thead><tr>
+                <th>Código<br>interno</th><th>Código</th><th style="text-align: left;">Artículo</th>
+                <th class="center">Cantidad<br>pedida</th><th class="center">Unidades<br>pedidas</th>
+                <th class="num">Precio<br>unitario</th><th class="num">Descuento</th>
+                <th class="num">Impuesto</th><th class="num">Total</th>
+            </tr></thead>
+            <tbody>
+                {% for line in lines %}
+                <tr{% if loop.index is even %} class="zebra"{% endif %}>
+                    <td>{{ line.internal_code | e }}</td><td>{{ line.code | e }}</td>
+                    <td>{{ line.description | e }}</td>
+                    <td class="center">{{ line.quantity_ordered }}</td><td class="center">{{ line.units_ordered }}</td>
+                    <td class="num">{{ line.unit_price | format_currency }}</td>
+                    <td class="num discount">{{ line.discount | format_currency }}</td>
+                    <td class="num">{{ line.tax | format_currency }}</td>
+                    <td class="num line-total">{{ line.line_total | format_currency }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section summary">
+        <table class="details-layout"><tr>
+            <td style="width: 49%;">
+                <table class="panel counts"><tr>
+                    <td><div class="section-label">LÍNEAS</div><div class="count">{{ line_count }}</div></td>
+                    <td><div class="section-label">CANTIDAD PEDIDA</div><div class="count">{{ total_quantities }}</div></td>
+                    <td><div class="section-label">UNIDADES PEDIDAS</div><div class="count">{{ total_units_ordered }}</div></td>
+                </tr></table>
+            </td>
+            <td style="width: 2%;"></td>
+            <td>
+                <table class="panel totals">
+                    <tr><td class="muted">Subtotal</td><td class="num value">{{ subtotal | format_currency }}</td></tr>
+                    <tr><td class="muted">Descuento</td><td class="num value discount">{{ total_discounts | format_currency }}</td></tr>
+                </table>
+                <table class="total-pill"><tr><td>Total</td><td class="num">{{ grand_total | format_currency }}</td></tr></table>
+            </td>
+        </tr></table>
+    </div>
 </body>
 </html>

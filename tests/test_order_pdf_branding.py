@@ -1,6 +1,8 @@
 """Purchase-order and distribution PDFs share the configured supplier artwork."""
 
 import base64
+import re
+from html import unescape
 from unittest.mock import patch
 
 import pytest
@@ -8,6 +10,8 @@ import pytest
 from app.mappers.orders_mapper import build_crossdocking_data
 from app.models.order import Order
 from app.models.organization import Organization
+from app.models.order_line import OrderLine
+from app.models.product import Product
 from app.services.pdf_service import (
     _document_logo_source,
     render_crossdocking_html,
@@ -58,3 +62,61 @@ def test_logo_download_failure_keeps_the_existing_url_fallback():
         "app.services.pdf_service.download_from_s3", side_effect=RuntimeError("unavailable"),
     ):
         assert _document_logo_source(LOGO_URL) == LOGO_URL
+
+
+def _rendered_item_rows(html):
+    body = re.search(r"<tbody>(.*?)</tbody>", html, re.S).group(1)
+    return [
+        [unescape(re.sub(r"<[^>]+>", "", cell)).strip() for cell in re.findall(r"<td\b[^>]*>(.*?)</td>", row, re.S)]
+        for row in re.findall(r"<tr\b[^>]*>(.*?)</tr>", body, re.S)
+    ]
+
+
+def test_pdf_preserves_order_line_codes_descriptions_and_discount_amounts():
+    order = Order(document_number="2900679464", discounts=835, subtotal=26356, grand_total=28838.73)
+    product = Product(name="Catalog product", description="Changed catalog text", codes=[
+        {"code_type_id": "04", "number": "different-item"},
+        {"code_type_id": "03", "number": "different-barcode"},
+    ])
+    first = OrderLine(
+        line_number=1, description="Order article & description", quantity_ordered=4,
+        units_ordered=12, unit_price=4333, discount=549.11, tax=2181.78,
+        line_total=18964.67, codes=[
+            {"code_type_id": "04", "number": "2645516"},
+            {"code_type_id": "03", "number": "7441119600652"},
+        ],
+    )
+    first.product = product
+    second = OrderLine(
+        line_number=2, description="Manual article", quantity_ordered=4,
+        units_ordered=12, unit_price=2256, discount=285.89, tax=1135.95,
+        line_total=9874.06,
+    )
+    order.lines = [first, second]
+
+    html = render_order_html(order)
+    rows = _rendered_item_rows(html)
+
+    assert rows == [
+        ["2645516", "7441119600652", "Order article & description", "4", "12", "4,333.00", "549.11", "2,181.78", "18,964.67"],
+        ["", "", "Manual article", "4", "12", "2,256.00", "285.89", "1,135.95", "9,874.06"],
+    ]
+    assert '>835.00</td>' in html
+    assert '>28,838.73</td>' in html
+    assert "different-item" not in html and "Changed catalog text" not in html
+    # Rendering changes neither the amounts nor the order's own article data.
+    assert first.discount == 549.11 and second.discount == 285.89 and order.discounts == 835
+
+
+def test_legacy_order_line_keeps_catalog_fallback_and_zero_discount():
+    line = OrderLine(quantity_ordered=1, units_ordered=1, unit_price=100, discount=0, tax=13, line_total=113)
+    line.product = Product(name="Legacy product", description="Legacy article", codes=[
+        {"code_type_id": "04", "number": "legacy-item"},
+        {"code_type_id": "03", "number": "legacy-barcode"},
+    ])
+    order = Order(document_number="LEGACY", discounts=0)
+    order.lines = [line]
+
+    rows = _rendered_item_rows(render_order_html(order))
+
+    assert rows == [["legacy-item", "legacy-barcode", "Legacy article", "1", "1", "100.00", "0.00", "13.00", "113.00"]]
