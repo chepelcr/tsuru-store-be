@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
+
+from app.utils.party_numbers import raw_identification, raw_number
 
 
 #: Digits an identification number must have, per Hacienda type code.
@@ -34,22 +36,14 @@ class IdentificationRequestDTO(BaseModel):
 
     @model_validator(mode="after")
     def validate_number_length_for_code(self):
-        """A number must have the number of digits its own type requires.
-
-        Only digits are counted, so a masked `1-1234-5678` from the POS and the
-        raw `112345678` it stores elsewhere both pass — the two client drawers
-        disagree about whether to mask, and a document is not the place to find
-        that out.
-        """
+        """Normalize domestic numbers before validation and persistence."""
+        self.number = raw_identification(self.number, self.code)
         if not self.number or not self.code:
             return self
         bounds = ID_NUMBER_LENGTHS.get(self.code)
         if bounds is None:
             return self
-        # A passport is alphanumeric and counted whole; the Costa Rican types
-        # are digits, counted after the mask is stripped — the POS's two client
-        # drawers disagree about whether to store `1-1234-5678` or `112345678`,
-        # and an API is not the place to discover that.
+        # Domestic numbers are canonical digits; foreign identifiers retain letters.
         if self.code == PASSPORT_CODE:
             length = len(self.number.strip())
         else:
@@ -71,6 +65,11 @@ class PhoneRequestDTO(BaseModel):
     area_code: Optional[str] = Field(None, max_length=10)
     number: Optional[str] = Field(None, max_length=20)
     description: Optional[str] = Field(None, max_length=50)
+
+    @field_validator("number", "area_code", mode="before")
+    @classmethod
+    def normalize_number(cls, value):
+        return raw_number(value)
 
 
 class ResidenceRequestDTO(BaseModel):

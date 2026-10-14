@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        /* Embedded fonts can disappear after page 1 in Qt's footer frames. */
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; color: #655D54; font-size: 10px; }
+        .footer { border-top: 2px solid #E8B83A; border-radius: 10px; background: #F4EFE6; padding: 6px 10px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        td { padding: 0; vertical-align: middle; word-wrap: break-word; }
+        .document { color: #3D4045; }
+        .brand { text-align: center; }
+        .logo-window { width: 100px; height: 40px; position: relative; overflow: hidden; margin: 0 auto; }
+        .brand img { width: 120px; height: 40px; max-width: none; position: absolute; left: -10px; top: 0; }
+        .page-label { text-align: right; color: #3D4045; white-space: nowrap; }
+    </style>
+    <script>
+        function subst() {
+            var vars = {};
+            var query = document.location.search.substring(1).split('&');
+            for (var i = 0; i < query.length; i++) {
+                var pair = query[i].split('=');
+                vars[pair[0]] = decodeURIComponent(pair[1] || '');
+            }
+            var targets = ['page', 'topage'];
+            for (var t = 0; t < targets.length; t++) {
+                var els = document.getElementsByClassName(targets[t]);
+                for (var j = 0; j < els.length; j++) els[j].textContent = vars[targets[t]] || '1';
+            }
+        }
+    </script>
+</head>
+<body onload="subst()">
+    <div class="footer"><table><tr>
+        <td class="document">Orden de compra #{{ document_number | e }}<br>Generado por Tsuru</td>
+        <td class="brand"><div class="logo-window"><img src="{{ tsuru_logo | e }}" alt="Tsuru"></div></td>
+        <td class="page-label">Página <span class="page">1</span> de <span class="topage">1</span></td>
+    </tr></table></div>
+</body>
+</html>

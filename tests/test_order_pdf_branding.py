@@ -16,6 +16,8 @@ from app.services.pdf_service import (
     _document_logo_source,
     render_crossdocking_html,
     render_order_html,
+    render_order_footer_html,
+    generate_pdf,
 )
 
 
@@ -135,3 +137,41 @@ def test_order_pdf_uses_the_actual_currency_for_non_colon_orders():
     assert _rendered_item_rows(html)[0][-4:] == ["$100.00", "$5.00", "$0.00", "$95.00"]
     assert '>$95.00</td>' in html
     assert "₡" not in html
+
+
+def test_order_pdf_shows_the_full_totals_in_order_including_zero_tax():
+    order = Order(document_number="TOTALS", subtotal=100, discounts=100, net_total=0, taxes=0, grand_total=0)
+    html = render_order_html(order)
+    labels = [html.index(f'>{label}</td>') for label in ['Subtotal', 'Descuento', 'Total neto', 'Impuesto', 'Total']]
+    assert labels == sorted(labels)
+    assert re.search(r'>Total neto</td><td[^>]*>₡0\.00</td>', html)
+    assert re.search(r'>Impuesto</td><td[^>]*>₡0\.00</td>', html)
+
+
+def test_order_footer_is_branded_escaped_and_contains_no_invoice_legal_claim():
+    html = render_order_footer_html(Order(document_number='A&B<1>'))
+    assert 'A&amp;B&lt;1&gt;' in html
+    assert 'alt="Tsuru"' in html and 'data:image/png;base64,' in html
+    assert 'class="page"' in html and 'class="topage"' in html
+    assert '@font-face' not in html
+    assert 'Factura Electrónica' not in html
+
+
+def test_order_footer_reserves_space_and_cleans_up_its_temporary_file():
+    from pathlib import Path
+
+    captured = {}
+
+    def render(html, output, *, options, configuration):
+        captured.update(options)
+        assert Path(options['footer-html']).read_text() == '<html>footer</html>'
+        assert options['margin-bottom'] == '18'
+        assert options['footer-spacing'] == '3'
+        assert 'header-left' not in options and 'header-center' not in options
+        return b'%PDF-test'
+
+    with patch('app.services.pdf_service.pdfkit.configuration'), patch(
+        'app.services.pdf_service.pdfkit.from_string', side_effect=render,
+    ):
+        assert generate_pdf('<html>body</html>', footer_html='<html>footer</html>') == b'%PDF-test'
+    assert not Path(captured['footer-html']).exists()

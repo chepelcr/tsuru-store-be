@@ -2,6 +2,7 @@ import base64
 import logging
 import mimetypes
 import os
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -78,7 +79,7 @@ def render_order_html(order: Order) -> str:
     total_units_ordered = sum(ln.units_ordered or 0 for ln in lines_data)
     subtotal = float(order.subtotal or 0)
     total_discounts = float(order.discounts or 0)
-    net_total = float(order.net_total or 0)
+    net_total = float(order.net_total if order.net_total is not None else subtotal - total_discounts)
     total_taxes = float(order.taxes or 0)
     grand_total = float(order.grand_total or 0)
 
@@ -134,7 +135,7 @@ def render_order_html(order: Order) -> str:
         "supplier_internal_code": supplier_internal_code,
         "supplier_logo_url": supplier_logo_url,
         "document_number": order.document_number or "",
-        "creation_date_formatted": order.creation_date or "",
+        "creation_date_formatted": as_display(order.creation_date),
         # Formatted here, at the point of display: the column is a real date now.
         "delivery_date_formatted": as_display(order.delivery_date),
         "client_name": client_name,
@@ -159,7 +160,17 @@ def render_order_html(order: Order) -> str:
     return template.render(**template_model)
 
 
-def generate_pdf(html: str, header_left: str = "", header_center: str = "") -> bytes:
+def render_order_footer_html(order: Order) -> str:
+    """A compact, non-fiscal footer, repeated by the PDF renderer on each page."""
+    logo_path = Path(_template_dir) / "assets" / "tsuru_wordmark.png"
+    logo = "data:image/png;base64," + base64.b64encode(logo_path.read_bytes()).decode("ascii")
+    return _jinja_env.get_template("order_footer.html").render(
+        document_number=order.document_number or "",
+        tsuru_logo=logo,
+    )
+
+
+def generate_pdf(html: str, header_left: str = "", header_center: str = "", footer_html: Optional[str] = None) -> bytes:
     wkhtmltopdf_path = AppConfig.get_key("path.to.wkhtmltopdf", "/usr/local/bin/wkhtmltopdf")
     config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
 
@@ -168,8 +179,6 @@ def generate_pdf(html: str, header_left: str = "", header_center: str = "") -> b
         "page-size": "Letter",
         "print-media-type": None,
         "enable-local-file-access": None,
-        "header-left": header_left,
-        "header-center": header_center,
         "header-right": "# [page]",
         "header-font-size": "8",
         "header-spacing": "5",
@@ -181,8 +190,22 @@ def generate_pdf(html: str, header_left: str = "", header_center: str = "") -> b
         "encoding": "UTF-8",
         "no-outline": None,
     }
-    pdf_bytes = pdfkit.from_string(html, False, options=options, configuration=config)
-    return pdf_bytes
+    if header_left:
+        options["header-left"] = header_left
+    if header_center:
+        options["header-center"] = header_center
+    if not footer_html:
+        return pdfkit.from_string(html, False, options=options, configuration=config)
+
+    # wkhtmltopdf renders footer-html inside the bottom margin on EVERY page.
+    # Keep this optional so distribution labels retain their established layout.
+    options.update({"margin-bottom": "18", "footer-spacing": "3"})
+    options.pop("header-right")
+    with tempfile.TemporaryDirectory(prefix="order-pdf-") as directory:
+        footer_path = Path(directory) / "footer.html"
+        footer_path.write_text(footer_html, encoding="utf-8")
+        options["footer-html"] = str(footer_path)
+        return pdfkit.from_string(html, False, options=options, configuration=config)
 
 
 def _get_s3_session():
@@ -243,6 +266,7 @@ def create_order_pdf(order: Order) -> str:
         html,
         header_left=_document_print_date(),
         header_center="Orden de Compra",
+        footer_html=render_order_footer_html(order),
     )
     prefix = order_file_prefix(order)
     key = _s3_key(order.company_id, order.document_number, f"{prefix}-OC.pdf")

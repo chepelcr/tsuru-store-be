@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.utils.party_numbers import raw_number
 
 
 class SyncDTO(BaseModel):
@@ -15,6 +17,11 @@ class SyncDTO(BaseModel):
 class BranchPhoneDTO(SyncDTO):
     country_code: Optional[Union[str, int]] = Field(None)
     number: Optional[Union[str, int]] = None
+
+    @field_validator("number", mode="before")
+    @classmethod
+    def normalize_number(cls, value):
+        return raw_number(value)
 
 
 class BranchResidenceDTO(SyncDTO):

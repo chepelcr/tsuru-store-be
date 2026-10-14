@@ -31,10 +31,10 @@
             border-collapse: separate;
             border-spacing: 0;
         }
-        .band { background: #6B2A22; border-top: 3px solid #E8B83A; border-radius: 12px; }
+        .band { background: #6B2A22; border-top: 3px solid #E8B83A; border-radius: 12px; table-layout: auto; }
         .band > tbody > tr > td { padding: 14px 12px; vertical-align: middle; }
-        .band .logo-cell { width: 24%; padding-right: 0; }
-        .logo-panel { background: #fff; border-radius: 8px; }
+        .band .logo-cell { width: 1%; padding-right: 0; }
+        .logo-panel { width: auto; display: inline-table; table-layout: auto; background: #fff; border-radius: 8px; }
         .logo-panel td { padding: 8px; vertical-align: middle; }
         .supplier-logo { display: block; max-width: 150px; max-height: 68px; width: auto; height: auto; margin: 0 auto; }
         .company-name { color: #fff; font-size: 14px; font-weight: 700; }
@@ -198,6 +198,7 @@
                 <table class="panel totals">
                     <tr><td class="muted">Subtotal</td><td class="num value">{{ subtotal | format_order_money(currency_code) }}</td></tr>
                     <tr><td class="muted">Descuento</td><td class="num value discount">{{ total_discounts | format_order_money(currency_code) }}</td></tr>
+                    <tr><td class="muted">Total neto</td><td class="num value">{{ net_total | format_order_money(currency_code) }}</td></tr>
                     <tr><td class="muted">Impuesto</td><td class="num value">{{ total_taxes | format_order_money(currency_code) }}</td></tr>
                 </table>
                 <table class="total-pill"><tr><td>Total</td><td class="num">{{ grand_total | format_order_money(currency_code) }}</td></tr></table>

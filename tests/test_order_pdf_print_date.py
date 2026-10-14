@@ -1,5 +1,5 @@
 """Printed dates follow Costa Rica's calendar, including UTC midnight."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -9,6 +9,7 @@ from app.services.pdf_service import (
     _document_print_date,
     create_crossdocking_pdf,
     create_order_pdf,
+    render_order_html,
 )
 
 
@@ -43,3 +44,14 @@ def test_both_order_documents_use_the_local_print_date(kind):
 
     clock.now.assert_called_once_with(timezone.utc)
     assert render_pdf.call_args.kwargs["header_left"] == "12/10/2026"
+
+
+@pytest.mark.parametrize('creation,delivery', [
+    ('2026-09-21', '2026-10-12'),
+    ('21/09/2026', '12/10/2026'),
+    (date(2026, 9, 21), date(2026, 10, 12)),
+])
+def test_creation_and_delivery_dates_share_the_day_month_year_print_format(creation, delivery):
+    html = render_order_html(Order(document_number='DATES', creation_date=creation, delivery_date=delivery))
+    assert '21/09/2026' in html and '12/10/2026' in html
+    assert '2026-09-21' not in html and '2026-10-12' not in html
