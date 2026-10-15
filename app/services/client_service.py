@@ -48,26 +48,25 @@ def get_clients(
             page=page,
             page_size=page_size,
         )
-
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
-    return ClientListResponse(
-        data=[_map_client(c) for c in clients],
-        pagination=PaginationResponse(
-            page=page,
-            page_size=page_size,
-            total_elements=total,
-            total_pages=total_pages,
-        ),
-    )
+        total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+        return ClientListResponse(
+            data=[_map_client(c) for c in clients],
+            pagination=PaginationResponse(
+                page=page,
+                page_size=page_size,
+                total_elements=total,
+                total_pages=total_pages,
+            ),
+        )
 
 
 def get_client(company_id: str, client_id: uuid.UUID) -> Optional[ClientResponse]:
     """Get a single client by ID."""
     with ClientRepository() as repo:
         client = repo.find_by_id_and_company(client_id, company_id)
-    if not client:
-        return None
-    return _map_client(client)
+        if not client:
+            return None
+        return _map_client(client)
 
 
 def create_client(
@@ -128,7 +127,7 @@ def create_client(
             )
             client = repo.save(client)
 
-    return _map_client(client)
+        return _map_client(client)
 
 
 def update_client(
@@ -192,7 +191,7 @@ def update_client(
 
         client = repo.save(client)
 
-    return _map_client(client)
+        return _map_client(client)
 
 
 def update_client_status(
@@ -214,7 +213,7 @@ def update_client_status(
         client.status = status
         client = repo.save(client)
 
-    return _map_client(client)
+        return _map_client(client)
 
 
 def _map_client(client: Client) -> ClientResponse:

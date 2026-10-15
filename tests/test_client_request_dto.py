@@ -7,8 +7,66 @@ resource in this service has a handler test; clients had none.
 import pytest
 from pydantic import ValidationError
 
+from app.services import client_service
 from app.dtos.requests.client_request_dto import ClientRequestDTO, IdentificationRequestDTO
 from app.dtos.requests.client_status_request_dto import ClientStatusRequestDTO
+
+
+class TestClientCreateResponse:
+    def test_maps_phone_country_before_repository_session_closes(self, monkeypatch):
+        class Repository:
+            active = False
+            saved_client = None
+
+            def __enter__(self):
+                self.active = True
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                self.active = False
+
+            def find_by_unique_key(self, company_id, client_gln, nationality):
+                return None
+
+            def save(self, client):
+                self.saved_client = client
+                return client
+
+        repo = Repository()
+        monkeypatch.setattr(client_service, "ClientRepository", lambda: repo)
+        expected_response = object()
+
+        def map_client(client):
+            assert repo.active
+            assert client.phone_country_code == "188"
+            assert client.phone_number == "89890512"
+            return expected_response
+
+        monkeypatch.setattr(client_service, "_map_client", map_client)
+
+        request = ClientRequestDTO.model_validate({
+            "customer_type": 3,
+            "nationality": "188",
+            "client_name": "Modas Laura",
+            "business_name": "VILMA CORELLA ARTAVIA",
+            "email": "vilmacorella@yahoo.com",
+            "identification": {"code": "01", "number": "102440077"},
+            "phone": {"country_code": "188", "number": "89890512"},
+            "residence": {
+                "state_id": 6,
+                "county_id": 1,
+                "district_id": 1,
+                "neighborhood_id": 4,
+                "address": "De la escuela Mora y Cañas, 150m oeste y 75m sur",
+            },
+        })
+
+        result = client_service.create_client("organization-1", request)
+
+        assert result is expected_response
+        assert not repo.active
+        assert repo.saved_client.identification_number == "102440077"
+        assert repo.saved_client.neighborhood_id == 4
 
 
 class TestWhatIdentifiesAClient:
