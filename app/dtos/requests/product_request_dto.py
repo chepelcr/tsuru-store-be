@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -344,7 +345,7 @@ class ProductRequestDTO(BaseModel):
     name: Optional[str] = Field(None)
     description: Optional[str] = Field(None)
     units_per_box: Optional[int] = Field(None)
-    price: Optional[int] = Field(None)
+    price: Optional[Decimal] = Field(None, max_digits=18, decimal_places=5)
     category_id: Optional[str] = Field(None)
     image: Optional[ImageDTO] = Field(None)
     # Preferred path: an already-uploaded asset URL (org media library / S3).
@@ -361,7 +362,7 @@ class ProductRequestDTO(BaseModel):
     on_sale: Optional[bool] = Field(None)
     # Storefront "Oferta" flag (independent of the on_sale discount mechanic).
     is_offer: Optional[bool] = Field(None)
-    original_price: Optional[int] = Field(None)
+    original_price: Optional[Decimal] = Field(None, max_digits=18, decimal_places=5)
     discount: Optional[int] = Field(None)
 
     # CABYS reference — UUID of an existing data-services cabys row.

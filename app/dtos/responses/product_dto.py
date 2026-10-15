@@ -123,7 +123,7 @@ class ProductResponse(BaseModel):
     type: str = Field("product")
     on_sale: bool = Field(False)
     is_offer: bool = Field(False)
-    original_price: Optional[int] = Field(None)
+    original_price: Optional[float] = Field(None)
     discount: Optional[int] = Field(None)
     created_on: Optional[datetime] = Field(None)
     updated_on: Optional[datetime] = Field(None)

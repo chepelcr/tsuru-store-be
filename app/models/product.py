@@ -28,7 +28,7 @@ class Product(Base, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    price: Mapped[int] = mapped_column(Integer, nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(18, 5), nullable=False)
     category_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("categories.id"), nullable=False
     )
@@ -47,7 +47,9 @@ class Product(Base, TimestampMixin):
     # Storefront "Oferta" flag — independent of the ``on_sale`` discount
     # mechanic; flags a product/service the store wants to feature as an offer.
     is_offer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
-    original_price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    original_price: Mapped[Optional[Decimal]] = mapped_column(
+        Numeric(18, 5), nullable=True
+    )
     discount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     duration: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     difficulty: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)

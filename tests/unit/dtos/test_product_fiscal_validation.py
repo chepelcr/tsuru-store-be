@@ -11,10 +11,13 @@ the test, rather than from what this DTO happens to do.
 """
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from pydantic import ValidationError
 
 from app.dtos.requests.product_request_dto import ProductRequestDTO
+from app.dtos.responses.product_dto import ProductResponse
 
 
 def product(**overrides) -> dict:
@@ -32,6 +35,48 @@ def product(**overrides) -> dict:
 
 def build(**overrides) -> ProductRequestDTO:
     return ProductRequestDTO.model_validate(product(**overrides))
+
+
+class TestProductPrice:
+    def test_accepts_the_reported_product_request(self):
+        request = ProductRequestDTO.model_validate({
+            "name": "Consultoria de Inteligencia Artificial",
+            "price": 8849.56,
+            "category_id": "beb8e351-3de4-4f62-a2a2-f7091326ce10",
+            "track_inventory": False,
+            "units_per_box": 1,
+            "cabys_id": "3012a9db-e361-44fa-ae61-ee6b0daaa44f",
+            "unit_measure": "h",
+            "commercial_unit_measure": "h",
+            "codes": [{"code_type_id": "04", "number": "001"}],
+            "taxes": [{
+                "tax_type_id": "01",
+                "tax_rate": {"id": "08", "percentage": 13, "code": "08"},
+            }],
+            "image_url": None,
+        })
+
+        assert request.price == Decimal("8849.56")
+
+    def test_accepts_fractional_prices_without_losing_precision(self):
+        assert build(price=8849.56).price == Decimal("8849.56")
+        assert build(original_price=9999.95).original_price == Decimal("9999.95")
+
+    def test_rejects_precision_the_database_cannot_store(self):
+        with pytest.raises(ValidationError):
+            build(price=Decimal("8849.123456"))
+
+    def test_response_prices_remain_json_numbers(self):
+        response = ProductResponse(
+            product_id="product-1",
+            company_id="organization-1",
+            price=Decimal("8849.56"),
+            original_price=Decimal("9999.95"),
+        )
+
+        payload = response.model_dump(mode="json")
+        assert payload["price"] == 8849.56
+        assert payload["original_price"] == 9999.95
 
 
 class TestTaxCode:
@@ -215,4 +260,3 @@ class TestNonFiscalProducts:
         # CABYS is mandatory on a DOCUMENT, not in a catalogue an unregistered
         # org keeps. Reprocess and the backfills fill it in when one is needed.
         ProductRequestDTO.model_validate({"name": "Camisa", "price": 5000, "cabys_id": None})
-
