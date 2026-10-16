@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 def get_branch_types(organization_id: str, user_id: str) -> BranchTypeListResponse:
     """The organization's branch-type catalog, in display order."""
     with BranchTypeRepository() as repo:
+        repo.ensure_default_type(organization_id)
         branch_types = repo.find_all_by_organization(organization_id)
+        repo.session.commit()
 
     return BranchTypeListResponse(data=[_map_branch_type(bt) for bt in branch_types])
 
@@ -46,6 +48,7 @@ def create_branch_type(
             # Set explicitly rather than leaning on the column default, which only
             # materialises at flush time — the mapped response reads it right after.
             status=1,
+            is_default=False,
             created_by=user_id,
         )
         branch_type = repo.save(branch_type)
@@ -87,6 +90,9 @@ def delete_branch_type(organization_id: str, user_id: str, branch_type_id: str) 
         if not branch_type:
             return False
 
+        if branch_type.is_default:
+            raise ValueError("The default branch type cannot be deleted. You can edit its name and appearance.")
+
         in_use = repo.count_branches_using(branch_type.code, organization_id)
         if in_use:
             raise ValueError(
@@ -108,6 +114,7 @@ def _map_branch_type(branch_type: BranchType) -> BranchTypeResponse:
         color=branch_type.color,
         sort_order=branch_type.sort_order,
         status=branch_type.status,
+        is_default=branch_type.is_default,
         created_at=branch_type.created_on.isoformat() if branch_type.created_on else None,
         updated_at=branch_type.updated_on.isoformat() if branch_type.updated_on else None,
     )

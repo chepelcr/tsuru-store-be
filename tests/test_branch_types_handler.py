@@ -29,6 +29,7 @@ def _branch_type(org_id="org-123", code="stand", name="Puesto", **over):
         icon=over.pop("icon", "store"),
         color=over.pop("color", "primary"),
         sort_order=over.pop("sort_order", 0),
+        is_default=over.pop("is_default", False),
         created_by=over.pop("created_by", "user-456"),
         **over,
     )
@@ -57,12 +58,16 @@ class TestGetBranchTypes:
         assert result.data[0].id
 
     @patch("app.services.branch_type_service.BranchTypeRepository")
-    def test_empty_catalog_is_not_an_error(self, mock_repo_class):
+    def test_initial_catalog_contains_the_persisted_default(self, mock_repo_class):
         mock_repo = MagicMock()
-        mock_repo.find_all_by_organization.return_value = []
+        mock_repo.find_all_by_organization.return_value = [_branch_type(code="branch", name="Branch", is_default=True)]
         mock_repo_class.return_value.__enter__.return_value = mock_repo
 
-        assert branch_type_service.get_branch_types("org-123", "user-456").data == []
+        result = branch_type_service.get_branch_types("org-123", "user-456")
+        assert result.data[0].name == "Branch"
+        assert result.data[0].is_default is True
+        mock_repo.ensure_default_type.assert_called_once_with("org-123")
+        mock_repo.session.commit.assert_called_once()
 
 
 class TestCreateBranchType:
@@ -141,6 +146,15 @@ class TestUpdateBranchType:
 
 
 class TestDeleteBranchType:
+    @patch("app.services.branch_type_service.BranchTypeRepository")
+    def test_default_cannot_be_deleted_even_when_unused(self, mock_repo_class):
+        mock_repo = MagicMock()
+        mock_repo.find_by_id_and_organization.return_value = _branch_type(code="branch", name="Branch", is_default=True)
+        mock_repo_class.return_value.__enter__.return_value = mock_repo
+        with pytest.raises(ValueError, match="default branch type"):
+            branch_type_service.delete_branch_type("org-123", "user-456", str(uuid.uuid4()))
+        mock_repo.delete.assert_not_called()
+
     @patch("app.services.branch_type_service.BranchTypeRepository")
     def test_deletes_when_unused(self, mock_repo_class):
         existing = _branch_type()

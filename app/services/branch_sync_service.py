@@ -39,11 +39,7 @@ class BranchSyncService:
             consecutive_repo = ConsecutiveRepository.from_session(db.session)
             type_repo = BranchTypeRepository.from_session(db.session)
             document_repo = DocumentTypeRepository.from_session(db.session)
-            branch_types = type_repo.find_all_by_organization(organization_id)
-            default_type = (
-                branch_types[0].code if branch_types
-                else type_repo.ensure_general_type(organization_id).code
-            )
+            default_type = type_repo.ensure_default_type(organization_id).code
             document_types = {}
 
             # Stable lock order also avoids deadlocks if publishers reorder rows.

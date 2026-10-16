@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from sqlalchemy import Index, Integer, String
+from sqlalchemy import Boolean, Index, Integer, String, false, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,6 +34,7 @@ class BranchType(Base, TimestampMixin, StatusMixin):
     color: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
 
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
 
@@ -41,4 +42,7 @@ class BranchType(Base, TimestampMixin, StatusMixin):
         Index("idx_branch_types_org", "organization_id"),
         Index("idx_branch_types_status", "organization_id", "status"),
         Index("idx_branch_types_org_code", "organization_id", "code", unique=True),
+        Index("uq_branch_types_default", "organization_id", unique=True,
+              postgresql_where=text("is_default AND deleted_on IS NULL"),
+              sqlite_where=text("is_default AND deleted_on IS NULL")),
     )

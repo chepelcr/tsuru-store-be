@@ -73,10 +73,10 @@ def test_duplicate_reordered_history_never_rewinds_or_adds_one(sync_engine):
         assert counter.current_number == 99
         assert counter.document_type_id == 101
         assert counter.created_by == "hacienda-history"
-        assert session.scalar(select(Branch)).type == "general"
+        assert session.scalar(select(Branch)).type == "branch"
         catalog = session.scalars(select(BranchType)).all()
         assert len(catalog) == 1
-        assert catalog[0].code == "general"
+        assert catalog[0].code == "branch"
 
 
 def test_preserves_operator_branch_and_terminal_edits(sync_engine):
@@ -91,7 +91,7 @@ def test_preserves_operator_branch_and_terminal_edits(sync_engine):
     ))
     with Session(sync_engine) as session, session.begin():
         branch = session.scalar(select(Branch))
-        assert branch.type == "shop"
+        assert branch.type == "branch"
         assert branch.phone == "+506 22223333"
         assert branch.created_by == "hacienda-history"
         branch.name, branch.type, branch.address = "Operator name", "restaurant", "Operator address"

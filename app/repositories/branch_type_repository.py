@@ -20,18 +20,22 @@ class BranchTypeRepository(DatabaseConnection):
     def __init__(self):
         super().__init__()
 
-    def ensure_general_type(self, organization_id: str) -> BranchType:
-        """Persist a real editable type when automatic branch discovery starts an org.
+    def ensure_default_type(self, organization_id: str) -> BranchType:
+        """Every organization gets its own editable Branch default.
 
         Concurrent registration/history messages must reuse the same catalog row.
         """
         self.session.execute(
             insert(BranchType).values(
-                organization_id=organization_id, code="general", name="General",
-                icon="store", color="primary", sort_order=0, status=1, created_by="system",
+                organization_id=organization_id, code="branch", name="Branch",
+                icon="store", color="primary", sort_order=0, status=1, is_default=True, created_by="system",
             ).on_conflict_do_nothing(index_elements=["organization_id", "code"])
         )
-        return self.find_by_code_and_organization("general", organization_id)
+        branch_type = self.find_by_code_and_organization("branch", organization_id)
+        if not branch_type.is_default:
+            branch_type.is_default = True
+            self.session.flush()
+        return branch_type
 
     def find_all_by_organization(self, organization_id: str) -> List[BranchType]:
         """All non-deleted branch types for an organization, in display order."""
@@ -44,7 +48,7 @@ class BranchTypeRepository(DatabaseConnection):
                         BranchType.deleted_on.is_(None),
                     )
                 )
-                .order_by(BranchType.sort_order, BranchType.name)
+                .order_by(BranchType.is_default.desc(), BranchType.sort_order, BranchType.name)
             )
             return list(self.session.execute(stmt).scalars().all())
         except SQLAlchemyError as e:

@@ -19,6 +19,7 @@ class BranchTypeResponse(BaseModel):
     icon: Optional[str] = None
     color: Optional[str] = None
     sort_order: int = 0
+    is_default: bool = False
     status: int  # 1=Active 2=Inactive 3=Deleted
     created_at: Optional[str] = None  # ISO timestamp
     updated_at: Optional[str] = None  # ISO timestamp
