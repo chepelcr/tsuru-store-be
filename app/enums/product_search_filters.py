@@ -22,6 +22,7 @@ class ProductSearchFilters(BaseSearchFilter):
     CATEGORY_ID = ("category_id", "category_id", False, None, True, ENTITY_ALL, False, False, False, False)
     CATEGORY_NAME = ("name", "category_name", True, "category", True, ENTITY_ALL, True, False, False, True)
     STATUS = ("status", "status", False, None, True, ENTITY_ALL, False, False, False, False)
+    # Exact catalog classification: type:product | type:service | type:program.
     TYPE = ("type", "type", False, None, True, ENTITY_ALL, False, False, False, False)
     IS_OFFER = ("is_offer", "is_offer", False, None, True, ENTITY_ALL, False, False, False, False)
     PRICE = ("price", "price", False, None, True, ENTITY_ALL, False, True, True, False)

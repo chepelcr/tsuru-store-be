@@ -37,9 +37,7 @@ class Product(Base, TimestampMixin):
     stock_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     low_stock_threshold: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     track_inventory: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    is_service: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # First-class product kind: product | service | program. ``is_service`` is
-    # kept for backward compatibility (mirrors ``type == 'service'``).
+    # Storefront catalog classification, independent of the CABYS fiscal type.
     type: Mapped[str] = mapped_column(
         String(20), nullable=False, default=ProductType.PRODUCT.value, index=True
     )

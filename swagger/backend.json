@@ -26292,17 +26292,6 @@
             ],
             "title": "Track Inventory"
           },
-          "is_service": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Is Service"
-          },
           "type": {
             "anyOf": [
               {
@@ -26641,11 +26630,6 @@
             "type": "boolean",
             "title": "Track Inventory",
             "default": true
-          },
-          "is_service": {
-            "type": "boolean",
-            "title": "Is Service",
-            "default": false
           },
           "type": {
             "type": "string",

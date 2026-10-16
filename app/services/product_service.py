@@ -269,23 +269,9 @@ def update_product_status(
 
 
 def _apply_catalogue_fields(product: Product, dto: ProductRequestDTO) -> None:
-    """Apply storefront catalogue flags (type / is_service / on_sale / is_offer)
-    from the request DTO onto the product (mutates in place).
-
-    ``type`` is the canonical kind selector; ``is_service`` is kept in sync so
-    legacy readers that still check the boolean stay consistent.
-    """
+    """Apply storefront catalogue fields without changing CABYS fiscal data."""
     if dto.type is not None:
         product.type = dto.type
-        # Keep the legacy boolean consistent with the canonical kind.
-        product.is_service = dto.type == ProductType.SERVICE.value
-    if dto.is_service is not None:
-        product.is_service = dto.is_service
-        # Reconcile a bare is_service toggle into the canonical kind.
-        if dto.type is None:
-            product.type = (
-                ProductType.SERVICE.value if dto.is_service else ProductType.PRODUCT.value
-            )
     if dto.on_sale is not None:
         product.on_sale = dto.on_sale
     if dto.original_price is not None:
@@ -514,7 +500,6 @@ def _map_product(product: Product) -> ProductResponse:
         stock_quantity=product.stock_quantity,
         low_stock_threshold=product.low_stock_threshold,
         track_inventory=product.track_inventory,
-        is_service=product.is_service,
         type=product.type or ProductType.PRODUCT.value,
         on_sale=product.on_sale,
         is_offer=product.is_offer,

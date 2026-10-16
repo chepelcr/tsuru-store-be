@@ -119,7 +119,6 @@ class ProductResponse(BaseModel):
     stock_quantity: int = Field(0)
     low_stock_threshold: int = Field(10)
     track_inventory: bool = Field(True)
-    is_service: bool = Field(False)
     type: str = Field("product")
     on_sale: bool = Field(False)
     is_offer: bool = Field(False)

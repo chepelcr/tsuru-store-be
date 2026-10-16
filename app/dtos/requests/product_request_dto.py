@@ -356,7 +356,6 @@ class ProductRequestDTO(BaseModel):
     stock_quantity: Optional[int] = Field(None)
     low_stock_threshold: Optional[int] = Field(None)
     track_inventory: Optional[bool] = Field(None)
-    is_service: Optional[bool] = Field(None)
     # First-class product kind: product | service | program.
     type: Optional[str] = Field(None)
     on_sale: Optional[bool] = Field(None)

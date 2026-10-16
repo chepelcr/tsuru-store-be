@@ -1,16 +1,15 @@
 """Product type enumeration.
 
-Formalizes the `products.type` column as a first-class kind. Historically the
-column was a free-form string defaulting to ``"product"`` while the boolean
-``is_service`` carried the service/product distinction. ``type`` is now the
-canonical kind selector with three values:
+The `products.type` column is the storefront catalog classification:
 
     - product:  a tangible good (the default)
-    - service:  a service offering (was `is_service = True`)
+    - service:  a service offering
     - program:  a structured program / course (storefront "programs" section)
 
 ``on_sale`` remains the price-discount mechanic and ``is_offer`` is the
 storefront "Oferta" flag — both orthogonal to ``type``.
+
+Hacienda classification is separate: CABYS owns the fiscal product type.
 """
 
 from enum import Enum
