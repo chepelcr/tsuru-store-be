@@ -98,10 +98,6 @@ def _validate_branch_type(organization_id: str, code: Optional[str]) -> None:
         return
     with BranchTypeRepository() as type_repo:
         allowed = {row.code for row in type_repo.find_all_by_organization(organization_id)}
-    # An org with no catalog yet keeps the two legacy defaults, matching the
-    # seed in migration z6b7c8d9e0f1.
-    if not allowed:
-        allowed = {"stand", "restaurant"}
     if code not in allowed:
         raise ValueError(
             f"Branch type '{code}' is not in this organization's catalog "

@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.dialects.postgresql import insert
 
 from app.configuration.database_connection import DatabaseConnection
 from app.models.branch import Branch
@@ -18,6 +19,19 @@ class BranchTypeRepository(DatabaseConnection):
 
     def __init__(self):
         super().__init__()
+
+    def ensure_general_type(self, organization_id: str) -> BranchType:
+        """Persist a real editable type when automatic branch discovery starts an org.
+
+        Concurrent registration/history messages must reuse the same catalog row.
+        """
+        self.session.execute(
+            insert(BranchType).values(
+                organization_id=organization_id, code="general", name="General",
+                icon="store", color="primary", sort_order=0, status=1, created_by="system",
+            ).on_conflict_do_nothing(index_elements=["organization_id", "code"])
+        )
+        return self.find_by_code_and_organization("general", organization_id)
 
     def find_all_by_organization(self, organization_id: str) -> List[BranchType]:
         """All non-deleted branch types for an organization, in display order."""

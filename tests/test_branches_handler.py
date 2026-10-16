@@ -181,13 +181,15 @@ class TestCreateBranch:
             branch_service.create_branch(ORG_ID, USER_ID, dto)
         branch_repo.save.assert_not_called()
 
-    def test_an_org_with_no_catalog_still_accepts_the_legacy_defaults(self, branch_repo):
+    def test_an_org_with_no_catalog_rejects_phantom_legacy_defaults(self, branch_repo):
         branch_repo.branch_types.find_all_by_organization.return_value = []
         branch_repo.find_by_code_and_organization.return_value = None
         branch_repo.save.side_effect = saved
 
         dto = BranchCreateRequestDTO(name="Puesto 4", code=4, type="restaurant")
-        assert branch_service.create_branch(ORG_ID, USER_ID, dto).type == "restaurant"
+        with pytest.raises(ValueError, match="catalog"):
+            branch_service.create_branch(ORG_ID, USER_ID, dto)
+        branch_repo.save.assert_not_called()
 
 
 class TestUpdateBranch:

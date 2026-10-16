@@ -10,6 +10,7 @@ from app.dtos.requests.branch_type_request_dto import (
 )
 from app.dtos.responses.branch_type_dto import BranchTypeListResponse, BranchTypeResponse
 from app.services import branch_type_service
+from app.services.permission_guard import require_permission
 
 
 class BranchTypesController:
@@ -34,6 +35,7 @@ The response is unpaginated — this is a small selector catalog.""",
             organization_id: Annotated[str, Path(description="Organization identifier")],
             x_user_id: Annotated[str, Header(description="User identifier from header")],
         ) -> BranchTypeListResponse:
+            require_permission(organization_id, x_user_id, "admin", "read", "branch-types")
             try:
                 return branch_type_service.get_branch_types(organization_id, x_user_id)
             except ValueError as e:
@@ -65,6 +67,7 @@ The response is unpaginated — this is a small selector catalog.""",
             x_user_id: Annotated[str, Header(description="User identifier from header")],
             body: BranchTypeCreateRequestDTO,
         ) -> BranchTypeResponse:
+            require_permission(organization_id, x_user_id, "admin", "create", "branch-types")
             try:
                 return branch_type_service.create_branch_type(organization_id, x_user_id, body)
             except HTTPException:
@@ -91,6 +94,7 @@ a new one instead.""",
             x_user_id: Annotated[str, Header(description="User identifier from header")],
             body: BranchTypeUpdateRequestDTO,
         ) -> BranchTypeResponse:
+            require_permission(organization_id, x_user_id, "admin", "update", "branch-types")
             try:
                 result = branch_type_service.update_branch_type(
                     organization_id, x_user_id, branch_type_id, body
@@ -120,6 +124,7 @@ first.""",
             branch_type_id: Annotated[str, Path(description="Branch type identifier")],
             x_user_id: Annotated[str, Header(description="User identifier from header")],
         ):
+            require_permission(organization_id, x_user_id, "admin", "delete", "branch-types")
             try:
                 success = branch_type_service.delete_branch_type(
                     organization_id, x_user_id, branch_type_id

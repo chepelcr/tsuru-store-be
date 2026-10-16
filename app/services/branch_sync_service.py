@@ -31,6 +31,8 @@ class BranchSyncService:
             item if isinstance(item, BranchSyncDTO) else BranchSyncDTO.model_validate(item)
             for item in branches
         ]
+        if not payload:
+            return
         with DatabaseConnection() as db:
             branch_repo = BranchRepository.from_session(db.session)
             terminal_repo = TerminalRepository.from_session(db.session)
@@ -38,7 +40,10 @@ class BranchSyncService:
             type_repo = BranchTypeRepository.from_session(db.session)
             document_repo = DocumentTypeRepository.from_session(db.session)
             branch_types = type_repo.find_all_by_organization(organization_id)
-            default_type = branch_types[0].code if branch_types else "stand"
+            default_type = (
+                branch_types[0].code if branch_types
+                else type_repo.ensure_general_type(organization_id).code
+            )
             document_types = {}
 
             # Stable lock order also avoids deadlocks if publishers reorder rows.

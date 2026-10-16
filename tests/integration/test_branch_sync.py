@@ -73,7 +73,10 @@ def test_duplicate_reordered_history_never_rewinds_or_adds_one(sync_engine):
         assert counter.current_number == 99
         assert counter.document_type_id == 101
         assert counter.created_by == "hacienda-history"
-        assert session.scalar(select(Branch)).type == "stand"
+        assert session.scalar(select(Branch)).type == "general"
+        catalog = session.scalars(select(BranchType)).all()
+        assert len(catalog) == 1
+        assert catalog[0].code == "general"
 
 
 def test_preserves_operator_branch_and_terminal_edits(sync_engine):
